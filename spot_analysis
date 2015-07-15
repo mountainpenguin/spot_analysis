@@ -3,6 +3,7 @@
 import sys
 sys.path.append("/home/miles/Data/Work/MRes/project/lineage-app/lineage/lineage")
 from lineage_lib import track
+from analysis_lib import colourmap
 import glob
 import matplotlib.pyplot as plt
 import scipy.misc
@@ -12,6 +13,30 @@ import scipy.stats
 import numpy as np
 import json
 import datetime
+
+
+class DataPoint(list):
+    pass
+
+
+def deaxis(ax=None):
+    if not ax:
+        ax = plt.gca()
+    ax.axis("off")
+
+def despine(ax=None, keep=0):
+    if not ax:
+        ax = plt.gca()
+    ax.spines["right"].set_color("none")
+    ax.spines["top"].set_color("none")
+    if keep == 1:
+        ax.xaxis.set_ticks_position("bottom")
+        ax.yaxis.set_ticks_position("left")
+    elif keep == 0:
+        ax.spines["left"].set_color("none")
+        ax.spines["bottom"].set_color("none")
+        ax.xaxis.set_ticks_position("none")
+        ax.yaxis.set_ticks_position("none")
 
 
 class Analysis(track.Lineage):
@@ -70,29 +95,9 @@ class Analysis(track.Lineage):
         out = scipy.ndimage.gaussian_filter(img, 2)
         return out
 
-    def get_spots(self, cell, orientation=True):
-        frame_idx = cell.frame - 1
-        xs_l = cell.mesh[:, 0]
-        ys_l = cell.mesh[:, 1]
-        xs_r = cell.mesh[:, 2]
-        ys_r = cell.mesh[:, 3]
-
-        if not orientation:
-            xs_l = xs_l[::-1]
-            ys_l = ys_l[::-1]
-            xs_r = xs_r[::-1]
-            ys_r = ys_r[::-1]
-
-        M_x = (xs_l + xs_r) / 2
-        M_y = (ys_l + ys_r) / 2
-
-        p = scipy.misc.imread(self.phase[frame_idx])
-        f = scipy.misc.imread(self.fluor[frame_idx])
-        f_denoise = self.process_fluor(f)
-
-        f2 = scipy.misc.imread(self.fluor2[frame_idx])
-        f2_denoise = self.process_fluor(f2)
-
+    def get_fluor_for_rib(self, data, mesh):
+        f, f_denoise, f2, f2_denoise = data
+        xs_l, xs_r, ys_l, ys_r = mesh
         i = 0
         F = []  # average fluor along each mesh 'rib'
         F_unsmoothed = []
@@ -140,6 +145,37 @@ class Analysis(track.Lineage):
                 F2.append(z2.max())
                 F2_unsmoothed.append(z2_unsmoothed.max())
             i += 1
+        return F, F_unsmoothed, F2, F2_unsmoothed
+
+    def get_spots(self, cell, orientation=True):
+        frame_idx = cell.frame - 1
+        xs_l = cell.mesh[:, 0]
+        ys_l = cell.mesh[:, 1]
+        xs_r = cell.mesh[:, 2]
+        ys_r = cell.mesh[:, 3]
+
+        if not orientation:
+            xs_l = xs_l[::-1]
+            ys_l = ys_l[::-1]
+            xs_r = xs_r[::-1]
+            ys_r = ys_r[::-1]
+
+        M_x = (xs_l + xs_r) / 2
+        M_y = (ys_l + ys_r) / 2
+
+        p = scipy.misc.imread(self.phase[frame_idx])
+        f = scipy.misc.imread(self.fluor[frame_idx])
+        f_denoise = self.process_fluor(f)
+
+        f2 = scipy.misc.imread(self.fluor2[frame_idx])
+        f2_denoise = self.process_fluor(f2)
+
+        data = f, f_denoise, f2, f2_denoise
+        mesh = xs_l, xs_r, ys_l, ys_r
+
+        F, F_unsmoothed, F2, F2_unsmoothed = self.get_fluor_for_rib(
+            data, mesh
+        )
 
         # M = np.column_stack((M_x, M_y))
         i = np.array(range(len(F)))
@@ -186,43 +222,86 @@ class Analysis(track.Lineage):
                     out.append(group[0])
             vals = sorted(out, key=lambda x: x[0])
 
+
+        # calculate ParA signal (f2)
+        # split cell into 8 segments
+        # determine total intensity of fluorescence in that region
+        num_ribs = len(cell.mesh)
+        interval = num_ribs / 8
+        seg_bounds = np.arange(
+            interval,
+            num_ribs + interval,
+            interval,
+            dtype=np.int
+        )
+        seg_polygons = []
+        for seg_bound in seg_bounds:
+            seg_mesh = cell.mesh[seg_bound - interval:seg_bound]
+            seg_xs_l = seg_mesh[:, 0]
+            seg_xs_r = seg_mesh[:, 2]
+            seg_ys_l = seg_mesh[:, 1]
+            seg_ys_r = seg_mesh[:, 3]
+            seg_mesh = seg_xs_l, seg_xs_r, seg_ys_l, seg_ys_r
+            _1, _2, seg_F2, _3 = self.get_fluor_for_rib(
+                data, seg_mesh
+            )
+            seg_total_F2 = np.sum(seg_F2)
+            seg_polygons.append(seg_total_F2)
+
+        vals = [
+            ((__[0] / i[-1]) * cell.length[0][0], __[1], cell.length[0][0]) for __ in vals
+        ]
+
         if self.debug:
             plt.figure()
             ax = plt.subplot(231)
             plt.imshow(p, cmap=plt.cm.gray)
             plt.plot(M_x, M_y, "r-")
-            _ = 0
-            while _ < xs_l.shape[0]:
-                plt.plot(
-                    (xs_l[_], xs_r[_]),
-                    (ys_l[_], ys_r[_]),
-                    "y-"
-                )
-                _ += 1
-
+#            _ = 0
+#            while _ < xs_l.shape[0]:
+#                plt.plot(
+#                    (xs_l[_], xs_r[_]),
+#                    (ys_l[_], ys_r[_]),
+#                    "y-"
+#                )
+#                _ += 1
+#
             for p in vals:
                 x, y = M_x[p[0]], M_y[p[0]]
                 plt.plot(
                     x, y, "r*"
                 )
 
+            plt.title("Phase")
+            deaxis()
+
             plt.subplot(232, sharex=ax, sharey=ax)
-            plt.imshow(f, cmap=plt.cm.hot)
-            plt.plot(xs_l, ys_l, "k-")
-            plt.plot(xs_r, ys_r, "k-")
+            plt.imshow(f2, cmap=colourmap.cm)
+            plt.plot(xs_l, ys_l, "w-")
+            plt.plot(xs_r, ys_r, "w-")
+            plt.title("ParA")
+            deaxis()
+
+            plt.subplot(233, sharex=ax, sharey=ax)
+            plt.imshow(f, cmap=colourmap.cm)
+            plt.plot(xs_l, ys_l, "w-")
+            plt.plot(xs_r, ys_r, "w-")
 
             for p in vals:
                 x, y = M_x[p[0]], M_y[p[0]]
                 plt.plot(
-                    x, y, "k*"
+                    x, y, "w*"
                 )
+            plt.title("ParB")
+            plt.xlim([0, f.shape[0]])
+            plt.ylim([0, f.shape[1]])
+            deaxis()
 
-            plt.subplot(233, sharex=ax, sharey=ax)
-            plt.imshow(f2, cmap=plt.cm.hot)
-            plt.plot(xs_l, ys_l, "k-")
-            plt.plot(xs_r, ys_r, "k-")
+            plt.subplot(235)
+            plt.plot(i, F2 - bg2, "k-")
+            plt.plot(i, F2_unsmoothed - bg2, "k-", alpha=0.4)
 
-            plt.subplot(234)
+            plt.subplot(236)
             plt.plot(i, F - bg, "k-")
             plt.plot(i, F_unsmoothed - bg, "k-", alpha=0.4)
             plt.plot([i[0], i[-1]], [m, m])
@@ -233,15 +312,8 @@ class Analysis(track.Lineage):
                     p[0], p[1], "r."
                 )
 
-            plt.subplot(235)
-            plt.plot(i, F2 - bg2, "k-")
-            plt.plot(i, F2_unsmoothed - bg2, "k-", alpha=0.4)
-
             plt.show()
 
-        vals = [
-            ((__[0] / i[-1]) * cell.length[0][0], __[1], cell.length[0][0]) for __ in vals
-        ]
         return vals
 
     def get_orientation(self, cell, prior):
@@ -375,7 +447,7 @@ class Analysis(track.Lineage):
             # 2. get difference
             d1 = spot1_norm - pole1_norm
             d2 = spot2_norm - pole2_norm
-            ax = plt.subplot(133)
+            plt.subplot(133)
             plt.plot(t_analysis1, d1, "r-")
             plt.plot(t_analysis2, d2, "b-")
             plt.title("Difference")
