@@ -13,6 +13,7 @@ import scipy.stats
 import numpy as np
 import json
 import datetime
+import seaborn as sns
 
 
 class DataPoint(list):
@@ -256,7 +257,9 @@ class Analysis(track.Lineage):
             plt.figure()
             ax = plt.subplot(231)
             plt.imshow(p, cmap=plt.cm.gray)
-            plt.plot(M_x, M_y, "r-")
+            # plt.plot(M_x, M_y, "r-")
+            plt.plot(xs_l, ys_l, "w-", lw=0.5)
+            plt.plot(xs_r, ys_r, "w-", lw=0.5)
 #            _ = 0
 #            while _ < xs_l.shape[0]:
 #                plt.plot(
@@ -277,15 +280,19 @@ class Analysis(track.Lineage):
 
             plt.subplot(232, sharex=ax, sharey=ax)
             plt.imshow(f2, cmap=colourmap.cm)
-            plt.plot(xs_l, ys_l, "w-")
-            plt.plot(xs_r, ys_r, "w-")
+            plt.plot(xs_l, ys_l, "w-", lw=0.5)
+            plt.plot(xs_r, ys_r, "w-", lw=0.5)
+            x, y = M_x[ParA_max[0]], M_y[ParA_max[0]]
+            plt.plot(
+                x, y, "w*"
+            )
             plt.title("ParA")
             deaxis()
 
             plt.subplot(233, sharex=ax, sharey=ax)
             plt.imshow(f, cmap=colourmap.cm)
-            plt.plot(xs_l, ys_l, "w-")
-            plt.plot(xs_r, ys_r, "w-")
+            plt.plot(xs_l, ys_l, "w-", lw=0.5)
+            plt.plot(xs_r, ys_r, "w-", lw=0.5)
 
             for p in vals:
                 x, y = M_x[p[0]], M_y[p[0]]
@@ -471,6 +478,8 @@ class Analysis(track.Lineage):
 
 
 if __name__ == "__main__":
+    sns.set_style("white")
+    sns.set_context("talk")
     if "-d" in sys.argv:
         debug = True
     else:
