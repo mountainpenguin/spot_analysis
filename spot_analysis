@@ -6,6 +6,7 @@ from lineage_lib import track
 from analysis_lib import colourmap
 import glob
 import matplotlib.pyplot as plt
+from matplotlib import gridspec
 import scipy.misc
 import scipy.ndimage
 import scipy.signal
@@ -13,8 +14,12 @@ import scipy.stats
 import numpy as np
 import json
 import datetime
+import operator
 import seaborn as sns
+import os
 
+
+#PX_UM = 0.12254  # 1px in um for 63x objective on WF2
 
 class DataPoint(list):
     pass
@@ -52,7 +57,10 @@ class Analysis(track.Lineage):
     def apply_alignments(self):
         f = 0
         for align in self.alignment:
-            cells = self.frames[f].cells
+            try:
+                cells = self.frames[f].cells
+            except IndexError:
+                break
             for c in cells:
                 c.mesh = c.mesh - [
                     align[1], align[0], align[1], align[0]
@@ -148,6 +156,13 @@ class Analysis(track.Lineage):
             i += 1
         return F, F_unsmoothed, F2, F2_unsmoothed
 
+    def peak_dist(self, x, l):
+        if x < l:
+            return x
+        else:
+            return l - x
+
+        #_p = lambda x: if x > len(F) // 2: return len(F) - x else return x
     def get_spots(self, cell, orientation=True):
         frame_idx = cell.frame - 1
         xs_l = cell.mesh[:, 0]
@@ -168,7 +183,7 @@ class Analysis(track.Lineage):
         f = scipy.misc.imread(self.fluor[frame_idx])
         f_denoise = self.process_fluor(f)
 
-        f2 = scipy.misc.imread(self.fluor2[frame_idx])
+        f2 = scipy.misc.imread(self.fluor2[frame_idx])  # f2 = ParA
         f2_denoise = self.process_fluor(f2)
 
         data = f, f_denoise, f2, f2_denoise
@@ -185,25 +200,34 @@ class Analysis(track.Lineage):
 
         # get peaks
         m = (F - bg).mean()
+        m2 = (F2 - bg2).mean()
         # s = np.std(F)
 
 #        # wavelet peak-finding method
 #        peaks = scipy.signal.find_peaks_cwt(
 #            F - bg, np.arange(1, 10)
 #        )
-#        vals = [
+#        ParB_vals = [
 #            (i[_p], (F - bg)[_p]) for _p in peaks if (F - bg)[_p] > m
 #        ]
 
         # argrelextrema peak-finding method
         peaks = scipy.signal.argrelextrema(F - bg, np.greater_equal)[0]
-        vals = [
+        ParB_vals = [
             (i[_z], (F - bg)[_z]) for _z in peaks if (F - bg)[_z] > m
         ]
 
+        # ParA peak is the maximum value
+        _parA = np.array(F2).argmax()
+        ParA_max = _parA, F2[_parA]
+
         # check distances between peaks
-        if len(vals) > 1:
-            modded = [(_i[0] // 10, (_i[0], _i[1])) for _i in vals]
+        if len(ParB_vals) > 1:
+            # group peaks into multiples of 10 for x position
+            # i.e. 0-9, 10-19, etc. are grouped together
+            modded = [(_i[0] // 10, (_i[0], _i[1])) for _i in ParB_vals]
+
+            # rearrange flat list of modded groups into grouped list
             grouped = set(map(lambda x: x[0], modded))
             groups = []
             for group in grouped:
@@ -216,41 +240,49 @@ class Analysis(track.Lineage):
             out = []
             for group in groups:
                 if len(group) > 1:
-                    # average
-                    index = int(np.mean([_val[0] for _val in group]))
-                    out.append((index, group[0][1]))
+#                    # average
+#                    index = int(np.mean([_val[0] for _val in group]))
+#                    out.append((index, group[0][1]))
+                    # use highest intensity value of group
+                    out.append(max(group, key=operator.itemgetter(1)))
                 else:
-                    out.append(group[0])
-            vals = sorted(out, key=lambda x: x[0])
+                   out.append(group[0])
+            ParB_vals = sorted(out, key=operator.itemgetter(0))
+            # if more than 2 spots, select two with greatest intensity
+#            if len(ParB_vals) > 2:
+#                ParB_vals = sorted([
+#                    ParB_vals.pop(ParB_vals.index(max(ParB_vals, key=operator.itemgetter(1)))),
+#                    ParB_vals.pop(ParB_vals.index(max(ParB_vals, key=operator.itemgetter(1))))
+#                ], key=operator.itemgetter(0))
 
+#        # calculate ParA signal (f2)
+#        # split cell into 8 segments
+#        # determine total intensity of fluorescence in that region
+#        num_ribs = len(cell.mesh)
+#        interval = num_ribs / 8
+#        seg_bounds = np.arange(
+#            interval,
+#            num_ribs + interval,
+#            interval,
+#            dtype=np.int
+#        )
+#        seg_polygons = []
+#        for seg_bound in seg_bounds:
+#            seg_mesh = cell.mesh[seg_bound - interval:seg_bound]
+#            seg_xs_l = seg_mesh[:, 0]
+#            seg_xs_r = seg_mesh[:, 2]
+#            seg_ys_l = seg_mesh[:, 1]
+#            seg_ys_r = seg_mesh[:, 3]
+#            seg_mesh = seg_xs_l, seg_xs_r, seg_ys_l, seg_ys_r
+#            _1, _2, seg_F2, _3 = self.get_fluor_for_rib(
+#                data, seg_mesh
+#            )
+#            seg_total_F2 = np.sum(seg_F2)
+#            seg_polygons.append(seg_total_F2)
 
-        # calculate ParA signal (f2)
-        # split cell into 8 segments
-        # determine total intensity of fluorescence in that region
-        num_ribs = len(cell.mesh)
-        interval = num_ribs / 8
-        seg_bounds = np.arange(
-            interval,
-            num_ribs + interval,
-            interval,
-            dtype=np.int
-        )
-        seg_polygons = []
-        for seg_bound in seg_bounds:
-            seg_mesh = cell.mesh[seg_bound - interval:seg_bound]
-            seg_xs_l = seg_mesh[:, 0]
-            seg_xs_r = seg_mesh[:, 2]
-            seg_ys_l = seg_mesh[:, 1]
-            seg_ys_r = seg_mesh[:, 3]
-            seg_mesh = seg_xs_l, seg_xs_r, seg_ys_l, seg_ys_r
-            _1, _2, seg_F2, _3 = self.get_fluor_for_rib(
-                data, seg_mesh
-            )
-            seg_total_F2 = np.sum(seg_F2)
-            seg_polygons.append(seg_total_F2)
-
-        vals = [
-            ((__[0] / i[-1]) * cell.length[0][0], __[1], cell.length[0][0]) for __ in vals
+        ParA_val = ((ParA_max[0] / i[-1]) * cell.length[0][0], ParA_max[1], cell.length[0][0])
+        ParB_vals = [
+            ((__[0] / i[-1]) * cell.length[0][0], __[1], cell.length[0][0]) for __ in ParB_vals
         ]
 
         if self.debug:
@@ -269,10 +301,14 @@ class Analysis(track.Lineage):
 #                )
 #                _ += 1
 #
-            for p in vals:
+            for p in ParB_vals:
                 x, y = M_x[p[0]], M_y[p[0]]
                 plt.plot(
                     x, y, "r*"
+                )
+                x, y = M_x[ParA_max[0]], M_y[ParA_max[0]]
+                plt.plot(
+                    x, y, "y*"
                 )
 
             plt.title("Phase")
@@ -294,7 +330,7 @@ class Analysis(track.Lineage):
             plt.plot(xs_l, ys_l, "w-", lw=0.5)
             plt.plot(xs_r, ys_r, "w-", lw=0.5)
 
-            for p in vals:
+            for p in ParB_vals:
                 x, y = M_x[p[0]], M_y[p[0]]
                 plt.plot(
                     x, y, "w*"
@@ -307,6 +343,10 @@ class Analysis(track.Lineage):
             plt.subplot(235)
             plt.plot(i, F2 - bg2, "k-")
             plt.plot(i, F2_unsmoothed - bg2, "k-", alpha=0.4)
+            plt.plot(
+                ParA_max[0], ParA_max[1] - bg2, "r."
+            )
+            plt.plot([i[0], i[-1]], [m2, m2])
 
             plt.subplot(236)
             plt.plot(i, F - bg, "k-")
@@ -314,14 +354,14 @@ class Analysis(track.Lineage):
             plt.plot([i[0], i[-1]], [m, m])
             # plt.plot([i[0], i[-1]], [m + s, m + s], "y-")
 
-            for p in vals:
+            for p in ParB_vals:
                 plt.plot(
                     p[0], p[1], "r."
                 )
 
             plt.show()
 
-        return vals
+        return ParA_val, ParB_vals
 
     def get_orientation(self, cell, prior):
         poles = cell.mesh[0, 0:2], cell.mesh[-1, 0:2]
@@ -345,14 +385,28 @@ class Analysis(track.Lineage):
         else:
             return False
 
+    def _crop(self, im, xmin, xmax, ymin, ymax):
+        return im[
+            xmin:xmax,
+            ymin:ymax
+        ]
+
     def spot_finder(self, phase, fluor, fluor2, cell_lines):
         self.phase = phase
         self.fluor = fluor
         self.fluor2 = fluor2
         self.get_timings()
+        cell_line_num = 1
         for cell_line in cell_lines:
+            if os.path.exists("data/data-lineage{0}.pdf".format(cell_line_num)):
+                print("Skipping cell lineage {0} of {1}".format(
+                    cell_line_num, len(cell_lines)
+                ))
+                cell_line_num += 1
+                continue
             L = []
-            S = []
+            S_A = []
+            S_B = []
             prior = None
             for cell in cell_line:
                 L.append(cell.length[0][0])
@@ -360,52 +414,242 @@ class Analysis(track.Lineage):
                     orientation = self.get_orientation(cell, prior)
                 else:
                     orientation = True
-                spots = self.get_spots(cell, orientation)
-                S.append(spots)
+                cell.orientation = orientation
+                spot_ParA, spots_ParB = self.get_spots(cell, orientation)
+                S_A.append(spot_ParA)
+                S_B.append(spots_ParB)
                 if orientation:
                     prior = cell.mesh[0, 0:2], cell.mesh[-1, 0:2]
                 else:
                     prior = cell.mesh[-1, 0:2], cell.mesh[0, 0:2]
 
-            plt.figure()
-            plt.subplot(131)
+
             start = cell_line[0].frame - 1
             end = cell_line[-1].frame - 1
             t = np.array(self.T[start:end + 1])
 
+            grid_width = len(S_A)
+            fig = plt.figure(figsize=(grid_width * 15, 30))
+            gs = gridspec.GridSpec(2, grid_width)
+
+            # show cells
+            frame_num = start + 1 - 1
+            sp_num = 0
+            while frame_num <= end:
+                centre = cell_line[sp_num].centre
+                rang = 40
+                xmin = centre[0] - rang
+                xmax = centre[0] + rang
+                ymin = centre[1] - rang
+                ymax = centre[1] + rang
+
+                mesh = cell_line[sp_num].mesh
+                if cell_line[sp_num].orientation:
+                    M_x = (mesh[:, 0] + mesh[:, 2]) / 2
+                    M_y = (mesh[:, 1] + mesh[:, 3]) / 2
+                else:
+                    M_x = (mesh[:, 0][::-1] + mesh[:, 2][::-1]) / 2
+                    M_y = (mesh[:, 1][::-1] + mesh[:, 3][::-1]) / 2
+
+                phase = scipy.misc.imread(self.phase[frame_num])
+                parB = scipy.misc.imread(self.fluor[frame_num])
+                parA = scipy.misc.imread(self.fluor2[frame_num])
+
+                bg_parA = parA - parA.mean()
+                bg_parA[bg_parA < 0] = np.NaN
+                bg_parA = np.dstack((
+                    bg_parA / np.nanmax(bg_parA),
+                    np.zeros(parA.shape),
+                    np.zeros(parA.shape),
+                ))
+
+                fig.add_subplot(gs[0, sp_num:sp_num + 1])
+                plt.imshow(phase, cmap=plt.cm.gray, alpha=1)
+                plt.imshow(bg_parA, alpha=.5)
+                # plot cell outline
+                plt.plot(mesh[:, 0], mesh[:, 1], "w-")
+                plt.plot(mesh[:, 2], mesh[:, 3], "w-")
+                # plot parA maximum
+                x, y = M_x[S_A[sp_num][0]], M_y[S_A[sp_num][0]]
+                plt.plot(x, y, "w*", ms=50)
+                plt.xlim([xmin, xmax])
+                plt.ylim([ymax, ymin])
+                deaxis()
+
+                bg_parB = parB - parB.mean()
+                bg_parB[bg_parB < 0] = np.NaN
+                bg_parB = np.dstack((
+                    np.zeros(parB.shape),
+                    bg_parB / np.nanmax(bg_parB),
+                    np.zeros(parB.shape),
+                ))
+
+                fig.add_subplot(gs[1, sp_num:sp_num + 1])
+                plt.imshow(phase, cmap=plt.cm.gray)
+                plt.imshow(bg_parB, alpha=.5)
+                plt.plot(mesh[:, 0], mesh[:, 1], "w-")
+                plt.plot(mesh[:, 2], mesh[:, 3], "w-")
+                spot_num = 1
+                # spot_max = len(S_B[sp_num])
+                for parB_spot in S_B[sp_num]:
+                    x, y = M_x[parB_spot[0]], M_y[parB_spot[0]]
+#                    if spot_max > 1:
+#                        if spot_num == 1:
+#                            #plt.plot(x, y, "r*", ms=50)
+#                            plt.arrow(x + 10, y - 10, -5, 5, head_width=2, fc="r", ec="r")
+#                        elif spot_num == spot_max:
+#                            #plt.plot(x, y, "b*", ms=50)
+#                            plt.arrow(x + 10, y - 10, -5, 5, head_width=2, fc="b", ec="b")
+#                        else:
+#                            plt.plot(x, y, "w*", ms=50)
+#                    else:
+#                        plt.plot(x, y, "w*", ms=50)
+                    plt.plot(x, y, "w*", ms=50)
+
+
+                    spot_num += 1
+                plt.xlim([xmin, xmax])
+                plt.ylim([ymax, ymin])
+                deaxis()
+
+                frame_num += 1
+                sp_num += 1
+
+            # gs.update(hspace=0)
+            if not os.path.exists("data"):
+                os.mkdir("data")
+            plt.savefig("data/image-lineage{0}.pdf".format(cell_line_num))
+
+            fig = plt.figure(figsize=(20, 10))
+            gs = gridspec.GridSpec(2, 3)
             # plot cell lengths with cell-centre at 0
             L = np.array(L)
 
-            plt.plot(t, L / 2, "k-")
-            plt.plot(t, (L / 2) * -1, "k-")
+            # plt.subplot(231)
+            fig.add_subplot(gs[0, 0])
+            plt.plot(t, L / 2, "k-", lw=2)
+            plt.plot(t, (L / 2) * -1, "k-", lw=2)
 
-            # track spot1 and spot2
+            spot1_ParA = []
+            i = 0
+            for tp in S_A:
+                spot1_ParA.append((t[i], tp[0] - (tp[2] / 2)))
+                i += 1
+            spot1_ParA = np.array(spot1_ParA)
+
+            plt.plot(spot1_ParA[:, 0], spot1_ParA[:, 1], "r-", lw=2)
+            i = 0
+            for s in S_A:
+                midcell = s[2] / 2
+                spot = s[0] - midcell
+                plt.plot(
+                    t[i],
+                    spot,
+                    "r.",
+                    ms=10
+                )
+                i += 1
+
+            plt.ylabel(r"Distance from mid-cell (px)")
+            plt.title("ParA")
+
+            # plt.subplot(232)
+            #fig.add_subplot(gs[1, 1])
+            ax_parA = fig.add_subplot(gs[0, 1])
+            plt.title("ParA maximum")
+            plt.plot(spot1_ParA[:, 0], (L / 2) - spot1_ParA[:, 1], "b-", lw=2, label="Distance from top pole")
+            plt.plot(spot1_ParA[:, 0], (L / 2) + spot1_ParA[:, 1], "r-", lw=2, label="Distance from bottom pole")
+            plt.legend(bbox_to_anchor=(1.65, 0.3))
+            plt.xlabel("Time (min)")
+            plt.ylabel("Distance (px)")
+
+#            t_analysis = t.copy()
+#            pole_norm = -(L / 2)
+#            pole_norm = pole_norm - pole_norm.mean()
+#
+#            # subtract mean from all values to normalise
+#
+#            spot1_ParA_norm = spot1_ParA[:, 1] - np.nanmean(spot1_ParA[:, 1])
+#
+#            i = len(spot1_ParA_norm) - 1
+#            while i > -1:
+#                if np.isnan(spot1_ParA_norm[i]):
+#                    t_analysis = np.delete(t_analysis, i)
+#                    pole_norm = np.delete(pole_norm, i)
+#                    spot1_ParA_norm = np.delete(spot1_ParA_norm, i)
+#                i -= 1
+#
+#            plt.subplot(232)
+#            plt.plot(t_analysis, pole_norm, "r--")
+#            plt.plot(t_analysis, spot1_ParA_norm, "r-")
+#            plt.title("Normalised")
+#            # represents the position of the bottom pole relative to its mean
+#            # position as a dotted red line
+#
+#            # represents the ParA spot position relative to its mean position
+#            # as a solid red line
+#
+#            d = spot1_ParA_norm - pole_norm
+#
+#            plt.subplot(233)
+#            plt.plot(t_analysis, d, "r-")
+#            plt.title("Difference")
+
+            # plt.subplot(234)
+            #fig.add_subplot(gs[2, 0])
+            ax_parB_mid = fig.add_subplot(gs[1, 0])
+            plt.plot(t, L / 2, "k-", lw=2)
+            plt.plot(t, -(L / 2), "k-", lw=2)
+
+            # track spot1_ParB and spot2_ParB
             # spot 1 is first spot and spot 2 is last spot
-#            spot1 = [
+#            spot1_ParB = [
 #                x[0] - (x[2] / 2) for x in [
 #                    y for y in S
 #                ]
 #            ]
-#            print(spot1)
-            spot1 = []
-            spot2 = []
+#            print(spot1_ParB)
+            spot1_ParB = []
+            spot2_ParB = []
             i = 0
-            for tp in S:
+            for tp in S_B:
                 if len(tp) > 1:
-                    spot1.append((t[i], tp[0][0] - (tp[0][2] / 2)))
-                    spot2.append((t[i], tp[-1][0] - (tp[-1][2] / 2)))
+                    spot1_ParB.append((t[i], tp[0][0] - (tp[0][2] / 2), tp[0][2]))
+                    spot2_ParB.append((t[i], tp[-1][0] - (tp[-1][2] / 2), tp[-1][2]))
                 else:
-                    spot1.append((t[i], np.NaN))
-                    spot2.append((t[i], np.NaN))
-                i += 1
-            spot1 = np.array(spot1)
-            spot2 = np.array(spot2)
+                    open("data/temp{0}".format(cell_line_num), "w").write("blah")
+                    print("Candidates:")
+                    option_idx = 0
+                    options = {}
+                    for timepoint in tp:
+                        print(" {0}: {1}".format(option_idx, timepoint[0] - (timepoint[2] / 2)))
+                        options[option_idx] = (timepoint[0] - (timepoint[2] / 2), timepoint[2])
+                        option_idx += 1
 
-            plt.plot(spot1[:, 0], spot1[:, 1], "r-")
-            plt.plot(spot2[:, 0], spot2[:, 1], "b-")
+                    print("Current red line:", spot1_ParB)
+                    #s1 = input("Red spot num: ")
+                    s1 = "0"
+                    if s1 != "":
+                        spot1_ParB.append((t[i], options[int(s1)][0], options[int(s1)][1]))
+
+                    print("Current blue line:", spot2_ParB)
+                    #s2 = input("Blue spot num: ")
+                    s2 = ""
+                    if s2 != "":
+                        spot2_ParB.append((t[i], options[int(s2)][0], options[int(s2)][1]))
+
+                i += 1
+            spot1_ParB = np.array(spot1_ParB)
+            spot2_ParB = np.array(spot2_ParB)
+
+            if spot1_ParB.shape[0] != 0:
+                plt.plot(spot1_ParB[:, 0], spot1_ParB[:, 1], "r-", lw=2)
+            if spot2_ParB.shape[0] != 0:
+                plt.plot(spot2_ParB[:, 0], spot2_ParB[:, 1], "b-", lw=2)
 
             i = 0
-            for s in S:
+            for s in S_B:
+                # s: (spot_position, intensity, cell_length)
                 for p in s:
                     midcell = p[2] / 2
                     spot = p[0] - midcell
@@ -413,52 +657,81 @@ class Analysis(track.Lineage):
                     plt.plot(
                         t[i],
                         spot,
-                        "r*"
+                        "r.",
+                        ms=10
                     )
                 i += 1
-            plt.ylabel("Distance from mid-cell (px)")
+            plt.ylabel(r"Distance from mid-cell (px)")
             plt.xlabel("Time (min)")
+            plt.title("ParB")
+
+            # ax = plt.subplot(235)
+            #ax = fig.add_subplot(gs[2, 1])
+            if spot2_ParB.shape[0] != 0:
+                ax_parB_top = fig.add_subplot(gs[1, 1], sharex=ax_parB_mid, sharey=ax_parA)
+                plt.title("ParB spot 1")
+                #plt.plot(spot2_ParB[:, 0], (L / 2) - spot2_ParB[:, 1], "b-", lw=2)
+                plt.plot(spot2_ParB[:, 0], (spot2_ParB[:, 2] / 2) - spot2_ParB[:, 1], "b-", lw=2)
+                plt.xlabel("Time (min)")
+                plt.ylabel("Distance from top pole (px)")
+
+            # plt.subplot(236, sharex=ax, sharey=ax)
+            #fig.add_subplot(gs[2, 2], sharex=ax, sharey=ax)
+            if spot1_ParB.shape[0] != 0:
+                if spot2_ParB.shape[0] == 0:
+                    fig.add_subplot(gs[1, 1], sharex=ax_parA, sharey=ax_parA)
+                else:
+                    fig.add_subplot(gs[1, 2], sharex=ax_parB_top, sharey=ax_parA)
+                plt.title("ParB spot 2")
+                # spot1_ParB (time, distance from midcell)
+                # -(L / 2) : bottom pole distance from midcell
+                #plt.plot(spot1_ParB[:, 0], spot1_ParB[:, 1] - (-(L / 2)), "r-", lw=2)
+                plt.plot(spot1_ParB[:, 0], spot1_ParB[:, 1] - (-(spot1_ParB[:, 2] / 2)), "r-", lw=2)
+                plt.xlabel("Time (min)")
+                plt.ylabel("Distance from bottom pole (px)")
+
+
 
             # dependent analysis
             # 1. subtract the mean from all values
 #            y1 = (-L / 2) - ((-L / 2).mean())
-#            y2 = spot1[:, 1] - (spot1[:, 1].mean())
-            t_analysis1 = t.copy()
-            t_analysis2 = t.copy()
-            pole1_norm = -(L / 2)
-            pole1_norm = pole1_norm - pole1_norm.mean()
-            pole2_norm = (L / 2) - ((L / 2).mean())
-            spot1_norm = spot1[:, 1] - np.nanmean(spot1[:, 1])
-            spot2_norm = spot2[:, 1] - np.nanmean(spot2[:, 1])
+#            y2 = spot1_ParB[:, 1] - (spot1_ParB[:, 1].mean())
 
-            i = len(spot1_norm) - 1
-            while i > -1:
-                if np.isnan(spot1_norm[i]):
-                    t_analysis1 = np.delete(t_analysis1, i)
-                    pole1_norm = np.delete(pole1_norm, i)
-                    spot1_norm = np.delete(spot1_norm, i)
-                if np.isnan(spot2_norm[i]):
-                    t_analysis2 = np.delete(t_analysis2, i)
-                    pole2_norm = np.delete(pole2_norm, i)
-                    spot2_norm = np.delete(spot2_norm, i)
-                i -= 1
-
-            plt.subplot(132)
-            plt.plot(t_analysis1, pole1_norm, "r--")
-            plt.plot(t_analysis1, spot1_norm, "r-")
-            plt.plot(t_analysis2, pole2_norm, "b--")
-            plt.plot(t_analysis2, spot2_norm, "b-")
-            plt.title("Normalised")
-            plt.xlabel("Time (min)")
-
-            # 2. get difference
-            d1 = spot1_norm - pole1_norm
-            d2 = spot2_norm - pole2_norm
-            plt.subplot(133)
-            plt.plot(t_analysis1, d1, "r-")
-            plt.plot(t_analysis2, d2, "b-")
-            plt.title("Difference")
-            plt.xlabel("Time (min)")
+#            pole1_norm = -(L / 2)
+#            pole1_norm = pole1_norm - pole1_norm.mean()
+#            pole2_norm = (L / 2) - ((L / 2).mean())
+#
+#            t_analysis1 = t.copy()
+#            t_analysis2 = t.copy()
+#            spot1_ParB_norm = spot1_ParB[:, 1] - np.nanmean(spot1_ParB[:, 1])
+#            spot2_ParB_norm = spot2_ParB[:, 1] - np.nanmean(spot2_ParB[:, 1])
+#
+#            i = len(spot1_ParB_norm) - 1
+#            while i > -1:
+#                if np.isnan(spot1_ParB_norm[i]):
+#                    t_analysis1 = np.delete(t_analysis1, i)
+#                    pole1_norm = np.delete(pole1_norm, i)
+#                    spot1_ParB_norm = np.delete(spot1_ParB_norm, i)
+#                if np.isnan(spot2_ParB_norm[i]):
+#                    t_analysis2 = np.delete(t_analysis2, i)
+#                    pole2_norm = np.delete(pole2_norm, i)
+#                    spot2_ParB_norm = np.delete(spot2_ParB_norm, i)
+#                i -= 1
+#
+#            plt.subplot(235)
+#            plt.plot(t_analysis1, pole1_norm, "r--")
+#            plt.plot(t_analysis1, spot1_ParB_norm, "r-")
+#            plt.plot(t_analysis2, pole2_norm, "b--")
+#            plt.plot(t_analysis2, spot2_ParB_norm, "b-")
+#            plt.xlabel("Time (min)")
+#
+#            # 2. get difference
+#            d1 = spot1_ParB_norm - pole1_norm
+#            d2 = spot2_ParB_norm - pole2_norm
+#            plt.subplot(236)
+#            plt.plot(t_analysis1, d1, "r-")
+#            plt.plot(t_analysis2, d2, "b-")
+#            plt.xlabel("Time (min)")
 
             # 3. calculate regression of d (y = mx + c)
 #            r_m, r_c, r_r, r_p, r_s = scipy.stats.linregress([t_analysis, d])
@@ -474,7 +747,12 @@ class Analysis(track.Lineage):
 #            ), transform=ax.transAxes)
 #            # 4. H0: m = 0; H1: m != 0
 
-            plt.show()
+            plt.tight_layout()
+            plt.savefig("data/data-lineage{0}.pdf".format(cell_line_num))
+            print("Processed cell lineage {0} of {1}".format(
+                cell_line_num, len(cell_lines)
+            ))
+            cell_line_num += 1
 
 
 if __name__ == "__main__":
