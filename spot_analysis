@@ -18,8 +18,8 @@ import operator
 import seaborn as sns
 import os
 
+# PX_UM = 0.12254  # 1px in um for 63x objective on WF2
 
-#PX_UM = 0.12254  # 1px in um for 63x objective on WF2
 
 class DataPoint(list):
     pass
@@ -29,6 +29,7 @@ def deaxis(ax=None):
     if not ax:
         ax = plt.gca()
     ax.axis("off")
+
 
 def despine(ax=None, keep=0):
     if not ax:
@@ -49,6 +50,7 @@ class Analysis(track.Lineage):
     MEAN = 1
     SUM = 2
     MAX = 3
+
     def __init__(self, debug, method=MEAN):
         self.debug = debug
         self.method = method
@@ -162,7 +164,8 @@ class Analysis(track.Lineage):
         else:
             return l - x
 
-        #_p = lambda x: if x > len(F) // 2: return len(F) - x else return x
+        # _p = lambda x: if x > len(F) // 2: return len(F) - x else return x
+
     def get_spots(self, cell, orientation=True):
         frame_idx = cell.frame - 1
         xs_l = cell.mesh[:, 0]
@@ -246,7 +249,7 @@ class Analysis(track.Lineage):
                     # use highest intensity value of group
                     out.append(max(group, key=operator.itemgetter(1)))
                 else:
-                   out.append(group[0])
+                    out.append(group[0])
             ParB_vals = sorted(out, key=operator.itemgetter(0))
             # if more than 2 spots, select two with greatest intensity
 #            if len(ParB_vals) > 2:
@@ -423,7 +426,6 @@ class Analysis(track.Lineage):
                 else:
                     prior = cell.mesh[-1, 0:2], cell.mesh[0, 0:2]
 
-
             start = cell_line[0].frame - 1
             end = cell_line[-1].frame - 1
             t = np.array(self.T[start:end + 1])
@@ -506,7 +508,6 @@ class Analysis(track.Lineage):
 #                        plt.plot(x, y, "w*", ms=50)
                     plt.plot(x, y, "w*", ms=50)
 
-
                     spot_num += 1
                 plt.xlim([xmin, xmax])
                 plt.ylim([ymax, ymin])
@@ -554,7 +555,7 @@ class Analysis(track.Lineage):
             plt.title("ParA")
 
             # plt.subplot(232)
-            #fig.add_subplot(gs[1, 1])
+            # fig.add_subplot(gs[1, 1])
             ax_parA = fig.add_subplot(gs[0, 1])
             plt.title("ParA maximum")
             plt.plot(spot1_ParA[:, 0], (L / 2) - spot1_ParA[:, 1], "b-", lw=2, label="Distance from top pole")
@@ -596,7 +597,7 @@ class Analysis(track.Lineage):
 #            plt.title("Difference")
 
             # plt.subplot(234)
-            #fig.add_subplot(gs[2, 0])
+            # fig.add_subplot(gs[2, 0])
             ax_parB_mid = fig.add_subplot(gs[1, 0])
             plt.plot(t, L / 2, "k-", lw=2)
             plt.plot(t, -(L / 2), "k-", lw=2)
@@ -627,13 +628,13 @@ class Analysis(track.Lineage):
                         option_idx += 1
 
                     print("Current red line:", spot1_ParB)
-                    #s1 = input("Red spot num: ")
+                    # s1 = input("Red spot num: ")
                     s1 = "0"
                     if s1 != "":
                         spot1_ParB.append((t[i], options[int(s1)][0], options[int(s1)][1]))
 
                     print("Current blue line:", spot2_ParB)
-                    #s2 = input("Blue spot num: ")
+                    # s2 = input("Blue spot num: ")
                     s2 = ""
                     if s2 != "":
                         spot2_ParB.append((t[i], options[int(s2)][0], options[int(s2)][1]))
@@ -666,17 +667,17 @@ class Analysis(track.Lineage):
             plt.title("ParB")
 
             # ax = plt.subplot(235)
-            #ax = fig.add_subplot(gs[2, 1])
+            # ax = fig.add_subplot(gs[2, 1])
             if spot2_ParB.shape[0] != 0:
                 ax_parB_top = fig.add_subplot(gs[1, 1], sharex=ax_parB_mid, sharey=ax_parA)
                 plt.title("ParB spot 1")
-                #plt.plot(spot2_ParB[:, 0], (L / 2) - spot2_ParB[:, 1], "b-", lw=2)
+                # plt.plot(spot2_ParB[:, 0], (L / 2) - spot2_ParB[:, 1], "b-", lw=2)
                 plt.plot(spot2_ParB[:, 0], (spot2_ParB[:, 2] / 2) - spot2_ParB[:, 1], "b-", lw=2)
                 plt.xlabel("Time (min)")
                 plt.ylabel("Distance from top pole (px)")
 
             # plt.subplot(236, sharex=ax, sharey=ax)
-            #fig.add_subplot(gs[2, 2], sharex=ax, sharey=ax)
+            # fig.add_subplot(gs[2, 2], sharex=ax, sharey=ax)
             if spot1_ParB.shape[0] != 0:
                 if spot2_ParB.shape[0] == 0:
                     fig.add_subplot(gs[1, 1], sharex=ax_parA, sharey=ax_parA)
@@ -685,12 +686,10 @@ class Analysis(track.Lineage):
                 plt.title("ParB spot 2")
                 # spot1_ParB (time, distance from midcell)
                 # -(L / 2) : bottom pole distance from midcell
-                #plt.plot(spot1_ParB[:, 0], spot1_ParB[:, 1] - (-(L / 2)), "r-", lw=2)
+                # plt.plot(spot1_ParB[:, 0], spot1_ParB[:, 1] - (-(L / 2)), "r-", lw=2)
                 plt.plot(spot1_ParB[:, 0], spot1_ParB[:, 1] - (-(spot1_ParB[:, 2] / 2)), "r-", lw=2)
                 plt.xlabel("Time (min)")
                 plt.ylabel("Distance from bottom pole (px)")
-
-
 
             # dependent analysis
             # 1. subtract the mean from all values
@@ -795,7 +794,6 @@ if __name__ == "__main__":
 #            lin.insert(0, p)
 #            f = p
 #        cell_lines.append(lin)
-
 
     phase = sorted(glob.glob("B/*.tif"))
     parA = sorted(glob.glob("F1/*.tif"))
