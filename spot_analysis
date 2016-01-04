@@ -17,12 +17,64 @@ import datetime
 import operator
 import seaborn as sns
 import os
+import random
+import string
+import hashlib
+import xlwt
 
 # PX_UM = 0.12254  # 1px in um for 63x objective on WF2
 
 
-class DataPoint(list):
-    pass
+class SpotTimeLapse(object):
+    def __init__(self, t, p, i, l):
+        self.id = hashlib.sha1("".join([
+            random.choice(
+                string.ascii_letters + string.digits
+            ) for x in range(40)
+        ]).encode("utf8")).hexdigest()
+        self.timing = [t]
+        if p < 0:
+            # bottom pole
+            self.POLE = -1
+        else:
+            self.POLE = 1
+        self.positions = [p]
+        self.intensity = [i]
+        self.lengths = [l]
+
+    def spots(self, adjust=True):
+        if adjust:
+            return np.array([
+                self.timing,
+                self.POLE * np.array(self.positions),
+                self.intensity
+            ]).T
+        else:
+            return np.array([
+                self.timing,
+                self.positions,
+                self.intensity
+            ]).T
+
+    def len(self):
+        return np.array(self.lengths)
+
+    def last(self):
+        return np.array([
+            self.timing[-1], self.positions[-1], self.intensity[-1]
+        ])
+
+    def append(self, t, p, i, l):
+        self.timing.append(t)
+        self.positions.append(p)
+        self.intensity.append(i)
+        self.lengths.append(l)
+
+    def __iadd__(self, other):
+        self.timing.append(other[0])
+        self.positions.append(other[1])
+        self.intensity.append(other[2])
+        self.lengths.append(other[3])
 
 
 def deaxis(ax=None):
@@ -202,17 +254,9 @@ class Analysis(track.Lineage):
         bg2 = f2.mean()
 
         # get peaks
-        m = (F - bg).mean()
-        m2 = (F2 - bg2).mean()
+        m = (F - bg).mean() - np.std(F - bg)
+        m2 = (F2 - bg2).mean() - np.std(F2 - bg2)
         # s = np.std(F)
-
-#        # wavelet peak-finding method
-#        peaks = scipy.signal.find_peaks_cwt(
-#            F - bg, np.arange(1, 10)
-#        )
-#        ParB_vals = [
-#            (i[_p], (F - bg)[_p]) for _p in peaks if (F - bg)[_p] > m
-#        ]
 
         # argrelextrema peak-finding method
         peaks = scipy.signal.argrelextrema(F - bg, np.greater_equal)[0]
@@ -228,7 +272,8 @@ class Analysis(track.Lineage):
         if len(ParB_vals) > 1:
             # group peaks into multiples of 10 for x position
             # i.e. 0-9, 10-19, etc. are grouped together
-            modded = [(_i[0] // 10, (_i[0], _i[1])) for _i in ParB_vals]
+            modval = 5
+            modded = [(_i[0] // modval, (_i[0], _i[1])) for _i in ParB_vals]
 
             # rearrange flat list of modded groups into grouped list
             grouped = set(map(lambda x: x[0], modded))
@@ -251,6 +296,14 @@ class Analysis(track.Lineage):
                 else:
                     out.append(group[0])
             ParB_vals = sorted(out, key=operator.itemgetter(0))
+
+            # remove any spot that is within 2 pixels of a pole
+
+            ParB_vals = [
+                _i for _i in ParB_vals
+                if self._pole_dist_check(_i, i, cell.length[0][0])
+            ]
+
             # if more than 2 spots, select two with greatest intensity
 #            if len(ParB_vals) > 2:
 #                ParB_vals = sorted([
@@ -365,6 +418,11 @@ class Analysis(track.Lineage):
             plt.show()
 
         return ParA_val, ParB_vals
+
+    def _pole_dist_check(self, pos, arr, clen, threshold=2):
+        p1_d = (pos[0] / arr[-1]) * clen
+        p2_d = clen - p1_d
+        return p1_d > threshold and p2_d > threshold
 
     def get_orientation(self, cell, prior):
         poles = cell.mesh[0, 0:2], cell.mesh[-1, 0:2]
@@ -540,6 +598,20 @@ class Analysis(track.Lineage):
 
             plt.plot(spot1_ParA[:, 0], spot1_ParA[:, 1], "r-", lw=2)
             i = 0
+
+            excel_wb = xlwt.Workbook()
+            ws_parA = excel_wb.add_sheet("ParA")
+            ws_parB = excel_wb.add_sheet("ParB")
+
+            ws_parA.write(0, 0, "Time")
+            ws_parA.write(0, 1, "Distance from top pole")
+            ws_parA.write(0, 2, "Distance from midcell")
+            ws_parA.write(0, 3, "Cell length")
+            ws_parB.write(0, 1, "Cell length")
+            ws_parA.write(0, 4, "Spot intensity")
+
+            parAs = {}
+
             for s in S_A:
                 midcell = s[2] / 2
                 spot = s[0] - midcell
@@ -549,6 +621,13 @@ class Analysis(track.Lineage):
                     "r.",
                     ms=10
                 )
+                ws_parA.write(i + 1, 0, int(t[i]))
+                ws_parA.write(i + 1, 1, float(s[0]))
+                ws_parA.write(i + 1, 2, float(spot))
+                ws_parA.write(i + 1, 3, float(s[2]))
+                ws_parB.write(i + 1, 1, float(s[2]))
+                ws_parA.write(i + 1, 4, float(s[1]))
+                parAs[t[i]] =  spot
                 i += 1
 
             plt.ylabel(r"Distance from mid-cell (px)")
@@ -556,198 +635,177 @@ class Analysis(track.Lineage):
 
             # plt.subplot(232)
             # fig.add_subplot(gs[1, 1])
-            ax_parA = fig.add_subplot(gs[0, 1])
+            ax_parA = fig.add_subplot(gs[1, 0])
             plt.title("ParA maximum")
             plt.plot(spot1_ParA[:, 0], (L / 2) - spot1_ParA[:, 1], "b-", lw=2, label="Distance from top pole")
             plt.plot(spot1_ParA[:, 0], (L / 2) + spot1_ParA[:, 1], "r-", lw=2, label="Distance from bottom pole")
-            plt.legend(bbox_to_anchor=(1.65, 0.3))
+            #plt.legend(bbox_to_anchor=(1.65, 0.3))
             plt.xlabel("Time (min)")
             plt.ylabel("Distance (px)")
 
-#            t_analysis = t.copy()
-#            pole_norm = -(L / 2)
-#            pole_norm = pole_norm - pole_norm.mean()
-#
-#            # subtract mean from all values to normalise
-#
-#            spot1_ParA_norm = spot1_ParA[:, 1] - np.nanmean(spot1_ParA[:, 1])
-#
-#            i = len(spot1_ParA_norm) - 1
-#            while i > -1:
-#                if np.isnan(spot1_ParA_norm[i]):
-#                    t_analysis = np.delete(t_analysis, i)
-#                    pole_norm = np.delete(pole_norm, i)
-#                    spot1_ParA_norm = np.delete(spot1_ParA_norm, i)
-#                i -= 1
-#
-#            plt.subplot(232)
-#            plt.plot(t_analysis, pole_norm, "r--")
-#            plt.plot(t_analysis, spot1_ParA_norm, "r-")
-#            plt.title("Normalised")
-#            # represents the position of the bottom pole relative to its mean
-#            # position as a dotted red line
-#
-#            # represents the ParA spot position relative to its mean position
-#            # as a solid red line
-#
-#            d = spot1_ParA_norm - pole_norm
-#
-#            plt.subplot(233)
-#            plt.plot(t_analysis, d, "r-")
-#            plt.title("Difference")
-
-            # plt.subplot(234)
-            # fig.add_subplot(gs[2, 0])
-            ax_parB_mid = fig.add_subplot(gs[1, 0])
+            ax_parB_mid = fig.add_subplot(gs[0, 1])
             plt.plot(t, L / 2, "k-", lw=2)
             plt.plot(t, -(L / 2), "k-", lw=2)
 
-            # track spot1_ParB and spot2_ParB
-            # spot 1 is first spot and spot 2 is last spot
-#            spot1_ParB = [
-#                x[0] - (x[2] / 2) for x in [
-#                    y for y in S
-#                ]
-#            ]
-#            print(spot1_ParB)
-            spot1_ParB = []
-            spot2_ParB = []
+            # fake for legend
+            plt.plot([0], [0], "b-", label="Distance from top pole")
+            plt.plot([0], [0], "r-", label="Distance from bottom pole")
+            plt.plot([0], [0], "k-", label="Distance from ParA focus")
+            #plt.legend(bbox_to_anchor=(1.65, 0.3))
+            plt.legend(bbox_to_anchor=(2, 0.1))
+
+            spots_ParB = []
             i = 0
             for tp in S_B:
-                if len(tp) > 1:
-                    spot1_ParB.append((t[i], tp[0][0] - (tp[0][2] / 2), tp[0][2]))
-                    spot2_ParB.append((t[i], tp[-1][0] - (tp[-1][2] / 2), tp[-1][2]))
+                if i > 0:
+                    tp_clone = list(tp)
+                    options = list(spots_ParB)
+                    TRAVEL_THRESHOLD = 5.1
+                    for opt in options:
+                        last_added = opt.last()
+                        distances = []
+                        if len(tp_clone) == 0:
+                            continue
+
+                        for tp_idx in range(len(tp_clone)):
+                            pos, inten, celllen = tp_clone.pop()
+                            distances.append((
+                                tp_idx, pos, inten, celllen,
+                                np.sqrt(
+                                    ((pos - (celllen / 2)) - last_added[1]) ** 2
+                                )
+                            ))
+                        d = np.array(distances)
+                        min_idx, min_pos, min_inten, min_celllen, min_dist = d[
+                            np.argmin(d[:, 4])
+                        ]
+                        dd_idx = 0
+                        for dd in distances:
+                            if dd_idx == min_idx and min_dist < TRAVEL_THRESHOLD:
+                                opt.append(
+                                    t[i],
+                                    min_pos - (min_celllen / 2),
+                                    min_inten,
+                                    min_celllen,
+                                )
+                            else:
+                                tp_idx, pos, inten, celllen, dist = dd
+                                tp_clone.append((
+                                    pos,
+                                    inten,
+                                    celllen
+                                ))
+                            dd_idx += 1
+
+                    # start new spot timelapses for unassigned foci
+                    for pos, inten, celllen in tp_clone:
+                        spots_ParB.append(SpotTimeLapse(
+                            t[i],
+                            pos - (celllen / 2),
+                            inten,
+                            celllen,
+                        ))
+
                 else:
-                    open("data/temp{0}".format(cell_line_num), "w").write("blah")
-                    print("Candidates:")
-                    option_idx = 0
-                    options = {}
-                    for timepoint in tp:
-                        print(" {0}: {1}".format(option_idx, timepoint[0] - (timepoint[2] / 2)))
-                        options[option_idx] = (timepoint[0] - (timepoint[2] / 2), timepoint[2])
-                        option_idx += 1
-
-                    print("Current red line:", spot1_ParB)
-                    # s1 = input("Red spot num: ")
-                    s1 = "0"
-                    if s1 != "":
-                        spot1_ParB.append((t[i], options[int(s1)][0], options[int(s1)][1]))
-
-                    print("Current blue line:", spot2_ParB)
-                    # s2 = input("Blue spot num: ")
-                    s2 = ""
-                    if s2 != "":
-                        spot2_ParB.append((t[i], options[int(s2)][0], options[int(s2)][1]))
+                    # start new spot timelapses
+                    for pos, inten, celllen in tp:
+                        spots_ParB.append(SpotTimeLapse(
+                            t[i],
+                            pos - (celllen / 2),
+                            inten,
+                            celllen,
+                        ))
 
                 i += 1
-            spot1_ParB = np.array(spot1_ParB)
-            spot2_ParB = np.array(spot2_ParB)
 
-            if spot1_ParB.shape[0] != 0:
-                plt.plot(spot1_ParB[:, 0], spot1_ParB[:, 1], "r-", lw=2)
-            if spot2_ParB.shape[0] != 0:
-                plt.plot(spot2_ParB[:, 0], spot2_ParB[:, 1], "b-", lw=2)
-
-            i = 0
-            for s in S_B:
-                # s: (spot_position, intensity, cell_length)
-                for p in s:
-                    midcell = p[2] / 2
-                    spot = p[0] - midcell
-                    # plot spots as distance from mid-cell
-                    plt.plot(
-                        t[i],
-                        spot,
-                        "r.",
-                        ms=10
-                    )
+            ws_parB.write(0, 0, "Time")
+            i = 1
+            time_dict = {}
+            for time_ in t:
+                ws_parB.write(i, 0, int(time_))
+                time_dict[float(time_)] = i
                 i += 1
+
+            rmax = max(time_dict.values())
+            ws_parB.write(rmax + 2, 0, "Intensity mean:")
+            ws_parB.write(rmax + 3, 0, "Intensity SEM:")
+            ws_parB.write(rmax + 4, 0, "Distance from ParA (mean):")
+            ws_parB.write(rmax + 5, 0, "Distance from ParA (SEM):")
+
+            col = 2
+            spotnum = 1
+            for x in spots_ParB:
+                s = x.spots(False)
+                plt.plot(s[:, 0], s[:, 1], lw=2, marker="o", markeredgecolor="k")
+                ws_parB.write(0, col, "Distance from mid-cell (Spot {0})".format(spotnum))
+                ws_parB.write(0, col + 1, "Intensity (Spot {0})".format(spotnum))
+                ws_parB.write(0, col + 2, "Distance from ParA (Spot {0})".format(spotnum))
+
+                dparA = []
+                for spot in s:
+                    r = time_dict[spot[0]]
+                    ws_parB.write(r, col, float(spot[1]))
+                    ws_parB.write(r, col + 1, float(spot[2]))
+                    dpA = parAs[spot[0]] - spot[1]
+                    dparA.append(dpA)
+                    ws_parB.write(r, col + 2, float(dpA))
+
+                # intensity mean and SEM for spot lineage
+                x.intensity_mean = s[:, 2].mean()
+                x.intensity_sem = s[:, 2].std() / np.sqrt(len(s[:, 1]))
+                ws_parB.write(rmax + 2, col + 1, float(x.intensity_mean))
+                ws_parB.write(rmax + 3, col + 1, float(x.intensity_sem))
+
+                # distance from ParA mean and SEM for spot lineage
+                x.parA_d = dparA
+                x.parA_dmean = np.mean(dparA)
+                x.parA_dsem = np.std(dparA) / np.sqrt(len(dparA))
+                ws_parB.write(rmax + 4, col + 2, float(x.parA_dmean))
+                ws_parB.write(rmax + 5, col + 2, float(x.parA_dsem))
+
+                col += 3
+                spotnum += 1
+
             plt.ylabel(r"Distance from mid-cell (px)")
             plt.xlabel("Time (min)")
             plt.title("ParB")
 
-            # ax = plt.subplot(235)
-            # ax = fig.add_subplot(gs[2, 1])
-            if spot2_ParB.shape[0] != 0:
-                ax_parB_top = fig.add_subplot(gs[1, 1], sharex=ax_parB_mid, sharey=ax_parA)
-                plt.title("ParB spot 1")
-                # plt.plot(spot2_ParB[:, 0], (L / 2) - spot2_ParB[:, 1], "b-", lw=2)
-                plt.plot(spot2_ParB[:, 0], (spot2_ParB[:, 2] / 2) - spot2_ParB[:, 1], "b-", lw=2)
+            # plot spot lineage which is on average closer to ParA
+            ax_parB_closest = fig.add_subplot(gs[1, 1], sharex=ax_parB_mid, sharey=ax_parA)
+            dmin = min(spots_ParB, key=lambda x: np.abs(x.parA_dmean))
+            s = dmin.spots(False)
+            # from midcell: s[:, 1]
+            dpol_t = (dmin.len() / 2) - s[:, 1]
+            dpol_b = (dmin.len() / 2) + s[:, 1]
+
+            plt.plot(s[:, 0], dpol_t, "b-", label="Distance from top pole")
+            plt.plot(s[:, 0], dpol_b, "r-", label="Distance from bottom pole")
+            plt.plot(s[:, 0], dmin.parA_d, "k-", label="Distance from ParA focus")
+
+            plt.title("ParB (dmin)")
+            plt.ylabel("Distance (px)")
+            plt.xlabel("Time (min)")
+
+            # plot two spot lineages with highest intensity
+            imax = max(spots_ParB, key=lambda x: x.intensity_mean)
+            if imax.id != dmin.id:
+                fig.add_subplot(gs[1, 2], sharex=ax_parB_closest, sharey=ax_parA)
+                s = imax.spots(False)
+                dpol_t = (imax.len() / 2) - s[:, 1]
+                dpol_b = (imax.len() / 2) + s[:, 1]
+
+                plt.plot(s[:, 0], dpol_t, "b-", label="Distance from top pole")
+                plt.plot(s[:, 0], dpol_b, "r-", label="Distance from bottom pole")
+                plt.plot(s[:, 0], imax.parA_d, "k-", label="Distance from ParA focus")
+
+                plt.title("ParB (imax)")
+                plt.ylabel("Distance (px)")
                 plt.xlabel("Time (min)")
-                plt.ylabel("Distance from top pole (px)")
-
-            # plt.subplot(236, sharex=ax, sharey=ax)
-            # fig.add_subplot(gs[2, 2], sharex=ax, sharey=ax)
-            if spot1_ParB.shape[0] != 0:
-                if spot2_ParB.shape[0] == 0:
-                    fig.add_subplot(gs[1, 1], sharex=ax_parA, sharey=ax_parA)
-                else:
-                    fig.add_subplot(gs[1, 2], sharex=ax_parB_top, sharey=ax_parA)
-                plt.title("ParB spot 2")
-                # spot1_ParB (time, distance from midcell)
-                # -(L / 2) : bottom pole distance from midcell
-                # plt.plot(spot1_ParB[:, 0], spot1_ParB[:, 1] - (-(L / 2)), "r-", lw=2)
-                plt.plot(spot1_ParB[:, 0], spot1_ParB[:, 1] - (-(spot1_ParB[:, 2] / 2)), "r-", lw=2)
-                plt.xlabel("Time (min)")
-                plt.ylabel("Distance from bottom pole (px)")
-
-            # dependent analysis
-            # 1. subtract the mean from all values
-#            y1 = (-L / 2) - ((-L / 2).mean())
-#            y2 = spot1_ParB[:, 1] - (spot1_ParB[:, 1].mean())
-
-#            pole1_norm = -(L / 2)
-#            pole1_norm = pole1_norm - pole1_norm.mean()
-#            pole2_norm = (L / 2) - ((L / 2).mean())
-#
-#            t_analysis1 = t.copy()
-#            t_analysis2 = t.copy()
-#            spot1_ParB_norm = spot1_ParB[:, 1] - np.nanmean(spot1_ParB[:, 1])
-#            spot2_ParB_norm = spot2_ParB[:, 1] - np.nanmean(spot2_ParB[:, 1])
-#
-#            i = len(spot1_ParB_norm) - 1
-#            while i > -1:
-#                if np.isnan(spot1_ParB_norm[i]):
-#                    t_analysis1 = np.delete(t_analysis1, i)
-#                    pole1_norm = np.delete(pole1_norm, i)
-#                    spot1_ParB_norm = np.delete(spot1_ParB_norm, i)
-#                if np.isnan(spot2_ParB_norm[i]):
-#                    t_analysis2 = np.delete(t_analysis2, i)
-#                    pole2_norm = np.delete(pole2_norm, i)
-#                    spot2_ParB_norm = np.delete(spot2_ParB_norm, i)
-#                i -= 1
-#
-#            plt.subplot(235)
-#            plt.plot(t_analysis1, pole1_norm, "r--")
-#            plt.plot(t_analysis1, spot1_ParB_norm, "r-")
-#            plt.plot(t_analysis2, pole2_norm, "b--")
-#            plt.plot(t_analysis2, spot2_ParB_norm, "b-")
-#            plt.xlabel("Time (min)")
-#
-#            # 2. get difference
-#            d1 = spot1_ParB_norm - pole1_norm
-#            d2 = spot2_ParB_norm - pole2_norm
-#            plt.subplot(236)
-#            plt.plot(t_analysis1, d1, "r-")
-#            plt.plot(t_analysis2, d2, "b-")
-#            plt.xlabel("Time (min)")
-
-            # 3. calculate regression of d (y = mx + c)
-#            r_m, r_c, r_r, r_p, r_s = scipy.stats.linregress([t_analysis, d])
-#            print("y = {0:.2f}x + {1:.2f}".format(r_m, r_c))
-#            print("r = {0:.2f}, p = {1:.5f}, stderr = {2:.5f}".format(
-#                r_r, r_p, r_s
-#            ))
-#            regress_x = np.linspace(t_analysis[0], t_analysis[-1])
-#            regress_y = r_m * regress_x + r_c
-#            plt.plot(regress_x, regress_y, "k--")
-#            plt.text(0.05, 0.97, r"$y = {0:.4f}x + {1:.4f}$; $r = {2:.4f}$; $p = {3:.6f}$".format(
-#                r_m, r_c, r_r, r_p
-#            ), transform=ax.transAxes)
-#            # 4. H0: m = 0; H1: m != 0
 
             plt.tight_layout()
             plt.savefig("data/data-lineage{0}.pdf".format(cell_line_num))
+
+            excel_wb.save("data/lineage{0}.xls".format(cell_line_num))
             print("Processed cell lineage {0} of {1}".format(
                 cell_line_num, len(cell_lines)
             ))
