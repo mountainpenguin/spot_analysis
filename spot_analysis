@@ -106,9 +106,10 @@ class Analysis(track.Lineage):
     SUM = 2
     MAX = 3
 
-    def __init__(self, debug, method=MEAN):
+    def __init__(self, debug, method=MEAN, skip=True):
         self.debug = debug
         self.method = method
+        self.SKIP = skip
         track.Lineage.__init__(self)
 
     def apply_alignments(self):
@@ -462,7 +463,7 @@ class Analysis(track.Lineage):
         self.get_timings()
         cell_line_num = 1
         for cell_line in cell_lines:
-            if os.path.exists("data/data-lineage{0}.pdf".format(cell_line_num)):
+            if self.SKIP and os.path.exists("data/data-lineage{0}.pdf".format(cell_line_num)):
                 print("Skipping cell lineage {0} of {1}".format(
                     cell_line_num, len(cell_lines)
                 ))
@@ -838,7 +839,11 @@ if __name__ == "__main__":
         debug = True
     else:
         debug = False
-    A = Analysis(debug=debug)
+    if "-s" in sys.argv:
+        skip = False
+    else:
+        skip = True
+    A = Analysis(debug=debug, skip=skip)
     A.apply_alignments()
 
     cell_lines = []
