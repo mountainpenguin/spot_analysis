@@ -76,6 +76,9 @@ class SpotTimeLapse(object):
         self.intensity.append(other[2])
         self.lengths.append(other[3])
 
+    def __len__(self):
+        return len(self.lengths)
+
 
 def deaxis(ax=None):
     if not ax:
@@ -771,36 +774,52 @@ class Analysis(track.Lineage):
             plt.title("ParB")
 
             # plot spot lineage which is on average closer to ParA
-            ax_parB_closest = fig.add_subplot(gs[1, 1], sharex=ax_parB_mid, sharey=ax_parA)
-            dmin = min(spots_ParB, key=lambda x: np.abs(x.parA_dmean))
-            s = dmin.spots(False)
-            # from midcell: s[:, 1]
-            dpol_t = (dmin.len() / 2) - s[:, 1]
-            dpol_b = (dmin.len() / 2) + s[:, 1]
+            filtered = [x for x in spots_ParB if len(x) > 4]
+            if len(filtered) > 0:
+                ax_parB_closest = fig.add_subplot(gs[1, 1], sharex=ax_parA, sharey=ax_parA)
+                dmin = min(
+                    filtered,
+                    key=lambda x: np.abs(x.parA_dmean)
+                )
+                s = dmin.spots(False)
+                # from midcell: s[:, 1]
+                dpol_t = (dmin.len() / 2) - s[:, 1]
+                dpol_b = (dmin.len() / 2) + s[:, 1]
 
-            plt.plot(s[:, 0], dpol_t, "b-", label="Distance from top pole")
-            plt.plot(s[:, 0], dpol_b, "r-", label="Distance from bottom pole")
-            plt.plot(s[:, 0], dmin.parA_d, "k-", label="Distance from ParA focus")
+                plt.plot(s[:, 0], dpol_t, marker=".", lw=2, mec="k", ms=10, label="Distance from top pole")
+                plt.plot(s[:, 0], dpol_b, marker=".", lw=2, mec="k", ms=10, label="Distance from bottom pole")
+                plt.plot(s[:, 0], dmin.parA_d, marker=".", lw=2, mec="k", ms=10, label="Distance from ParA focus")
 
-            plt.title("ParB (dmin)")
-            plt.ylabel("Distance (px)")
-            plt.xlabel("Time (min)")
+                plt.plot(plt.xlim(), [0, 0], "k--")
 
-            # plot two spot lineages with highest intensity
-            imax = max(spots_ParB, key=lambda x: x.intensity_mean)
-            if imax.id != dmin.id:
-                fig.add_subplot(gs[1, 2], sharex=ax_parB_closest, sharey=ax_parA)
-                s = imax.spots(False)
-                dpol_t = (imax.len() / 2) - s[:, 1]
-                dpol_b = (imax.len() / 2) + s[:, 1]
+    #            plt.plot(plt.xlim(), [x.parA_dmean, x.parA_dmean], "k--", lw=2)
 
-                plt.plot(s[:, 0], dpol_t, "b-", label="Distance from top pole")
-                plt.plot(s[:, 0], dpol_b, "r-", label="Distance from bottom pole")
-                plt.plot(s[:, 0], imax.parA_d, "k-", label="Distance from ParA focus")
-
-                plt.title("ParB (imax)")
+                plt.title("ParB Spot {0} (dmin)".format(dmin.spotnum))
                 plt.ylabel("Distance (px)")
                 plt.xlabel("Time (min)")
+
+            # plot two spot lineages with highest intensity
+                imax = max(spots_ParB, key=lambda x: x.intensity_mean)
+                if imax.id != dmin.id:
+                    fig.add_subplot(gs[1, 2], sharex=ax_parB_closest, sharey=ax_parA)
+                    s = imax.spots(False)
+                    dpol_t = (imax.len() / 2) - s[:, 1]
+                    dpol_b = (imax.len() / 2) + s[:, 1]
+
+                    plt.plot(s[:, 0], dpol_t, marker=".", lw=2, mec="k", ms=10, label="Distance from top pole")
+                    plt.plot(s[:, 0], dpol_b, marker=".", lw=2, mec="k", ms=10, label="Distance from bottom pole")
+                    plt.plot(s[:, 0], imax.parA_d, marker=".", lw=2, mec="k", ms=10, label="Distance from ParA focus")
+
+                    plt.plot(plt.xlim(), [0, 0], "k--")
+
+                    plt.title("ParB Spot {0} (imax)".format(imax.spotnum))
+                    plt.ylabel("Distance (px)")
+                    plt.xlabel("Time (min)")
+                    plt.legend(bbox_to_anchor=(0.8, 1.35))
+                else:
+                    plt.legend(bbox_to_anchor=(1.65, 1))
+            else:
+                ax_parA.legend(bbox_to_anchor=(1.65, 1))
 
             plt.tight_layout()
             plt.savefig("data/data-lineage{0}.pdf".format(cell_line_num))
