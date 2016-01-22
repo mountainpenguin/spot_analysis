@@ -21,6 +21,7 @@ import random
 import string
 import hashlib
 import xlwt
+import peakutils
 
 # PX_UM = 0.12254  # 1px in um for 63x objective on WF2
 
@@ -242,6 +243,25 @@ class Analysis(track.Lineage):
         f = scipy.misc.imread(self.fluor[frame_idx])
         f_denoise = self.process_fluor(f)
 
+#        plt.figure()
+#
+#        ax = plt.subplot(131)
+#        plt.imshow(p, cmap=colourmap.cm)
+#        plt.plot(xs_l, ys_l, "w-")
+#        plt.plot(xs_r, ys_r, "w-")
+#
+#        plt.subplot(132, sharex=ax, sharey=ax)
+#        plt.imshow(f, cmap=colourmap.cm)
+#        plt.plot(xs_l, ys_l, "w-")
+#        plt.plot(xs_r, ys_r, "w-")
+#
+#        plt.subplot(133, sharex=ax, sharey=ax)
+#        plt.imshow(f_denoise, cmap=colourmap.cm)
+#        plt.plot(xs_l, ys_l, "w-")
+#        plt.plot(xs_r, ys_r, "w-")
+#
+#        plt.show()
+
         f2 = scipy.misc.imread(self.fluor2[frame_idx])  # f2 = ParA
         f2_denoise = self.process_fluor(f2)
 
@@ -266,7 +286,49 @@ class Analysis(track.Lineage):
         cell.parB_fluorescence_unsmoothed = F_unsmoothed - bg
 
         # argrelextrema peak-finding method
-        peaks = scipy.signal.argrelextrema(F - bg, np.greater_equal)[0]
+#        np.save("test{0:02d}".format(cell.frame - 19), [F - bg, F_unsmoothed - bg])
+#        peaks = scipy.signal.argrelextrema(F - bg, np.greater_equal)[0]
+
+        # peakutil method
+        peaks1 = peakutils.indexes(F - bg, thres=0.3, min_dist=5)
+        model = 20
+        noisy_peaks = [
+            (F - bg) + np.random.normal(0, (F - bg).std() / 2, (F - bg).shape)
+            for x in range(20)
+        ]
+        smoothed_noisy = [
+            scipy.ndimage.gaussian_filter(x, 2)
+            for x in noisy_peaks
+        ]
+        noisy_indexes = [
+            peakutils.indexes(x, thres=0.3, min_dist=5)
+            for x in smoothed_noisy
+        ]
+        selected_indexes = {}
+        for noisy_indices in noisy_indexes + [peaks1]:
+            for noisy_index in noisy_indices:
+                if noisy_index in selected_indexes:
+                    selected_indexes[noisy_index] += 1
+                else:
+                    selected_indexes[noisy_index] = 1
+        noisy_bins = {}
+        for bin_low in range(selected_indexes and max(selected_indexes.keys()) or 0):
+            binrange = range(bin_low, bin_low + 3)
+            for noisy_pos, noisy_count in selected_indexes.items():
+                if noisy_pos in binrange and binrange in noisy_bins:
+                    noisy_bins[binrange] += noisy_count
+                elif noisy_pos in binrange:
+                    noisy_bins[binrange] = noisy_count
+
+        filtered_indexes = [
+            x[0] for x in noisy_bins.items() if x[1] >= model / 2
+        ]
+        peaks = []
+        for index in peaks1:
+            for index_range in filtered_indexes:
+                if index in index_range and index not in peaks:
+                    peaks.append(index)
+
         ParB_vals = [
             (i[_z], (F - bg)[_z]) for _z in peaks if (F - bg)[_z] > m
         ]
