@@ -749,6 +749,10 @@ class Analysis(track.Lineage):
                     TRAVEL_THRESHOLD = 5.1
                     for opt in options:
                         last_added = opt.last()
+                        if last_added[0] < t[i] - 15 * 4:
+                            # more than 3 timepoints ago
+                            continue
+
                         distances = []
                         if len(tp_clone) == 0:
                             continue
@@ -779,7 +783,7 @@ class Analysis(track.Lineage):
                                 tp_clone.append((
                                     pos,
                                     inten,
-                                    celllen
+                                    celllen,
                                 ))
                             dd_idx += 1
 
