@@ -1,0 +1,3 @@
+[submodule "lineage"]
+	path = lineage
+	url = git@github.com:mountainpenguin/lineage.git
