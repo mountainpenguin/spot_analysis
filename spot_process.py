@@ -11,7 +11,6 @@ for x in plt.rcParams:
     if x.startswith("keymap"):
         plt.rcParams[x] = ""
 
-plt.rcParams["text.usetex"] = True
 import matplotlib.gridspec
 import matplotlib.patches
 import matplotlib.transforms
@@ -103,32 +102,46 @@ class InteractivePlot(object):
                 ("Click", "Remove ParB spot"),
             ]
 
-        txt = r"""
-            \begin{tabular}{ll}
-                \textbf{Lineage:} & %(lineage_num)s\\
-                \textbf{Frame:} & %(frame_num)s\\
-                \\
-                \textbf{Keys:}\\
-                %(binding)s
-            \end{tabular}
-        """ % {
-            "lineage_num": self.lineage_num,
-            "frame_num": self.current_cell.frame,
-            "binding": "".join([
-                "{0} & {1}\\\\\n".format(k, v)
-                for k, v in bindings
-            ]),
+        col1 = [
+            "Lineage:",
+            "Frame:",
+            "",
+            "Keys:",
+        ]
+        col2 = [
+            str(self.lineage_num),
+            str(self.current_cell.frame),
+            "",
+            "",
+        ]
+        for k, v in bindings:
+            col1.append(k)
+            col2.append(v)
+
+        txt1 = "\n".join(col1)
+        font1 = matplotlib.font_manager.FontProperties()
+        font1.set_size("medium")
+        font1.set_weight("bold")
+        font1.set_family("sans-serif")
+        txt2 = "\n".join(col2)
+        font2 = font1.copy()
+        font2.set_weight("normal")
+
+        txt_params = {
+            "transform": self.status_plot.transAxes,
+            "horizontalalignment": "left",
+            "verticalalignment": "top",
         }
-        txt = "".join([
-            x.strip() for x in txt.split("\n")
-        ])
+
         self.status_plot.text(
-            0, 1,
-            txt,
-            transform=self.status_plot.transAxes,
-            horizontalalignment="left",
-            verticalalignment="top",
-            fontsize=13,
+            0, 1, txt1,
+            fontproperties=font1,
+            **txt_params
+        )
+        self.status_plot.text(
+            0.3, 1, txt2,
+            fontproperties=font2,
+            **txt_params
         )
 
     def mode_default(self):
