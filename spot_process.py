@@ -5,6 +5,7 @@ import re
 import numpy as np
 import datetime
 import os
+import tkinter.filedialog
 
 import matplotlib.pyplot as plt
 for x in plt.rcParams:
@@ -473,6 +474,11 @@ def process(f, noplot=False):
     InteractivePlot(cell_line, lineage_num, noplot=noplot)
 
 
+def get_path(wildcard=None):
+    root = tkinter.Tk()
+    root.withdraw()
+    path = tkinter.filedialog.askdirectory()
+    return path
 
 
 def main(noplot=False):
