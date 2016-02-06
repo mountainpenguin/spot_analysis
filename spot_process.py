@@ -189,7 +189,9 @@ class InteractivePlot(object):
         self.redraw()
 
     def draw_cell(self):
-        self.img_plot.imshow(self.current_cell.parB_img, cmap=plt.cm.viridis)
+        parB_img = self.current_cell.parB_img_bg
+        parB_img[np.isnan(parB_img)] = 0
+        self.img_plot.imshow(parB_img, cmap=plt.cm.viridis)
         self.img_plot.plot(self.current_cell.mesh[:, 0], self.current_cell.mesh[:, 1], "k-")
         self.img_plot.plot(self.current_cell.mesh[:, 2], self.current_cell.mesh[:, 3], "k-")
 
