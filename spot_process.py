@@ -6,6 +6,8 @@ import numpy as np
 import datetime
 import os
 import tkinter.filedialog
+import sys
+import json
 
 import matplotlib.pyplot as plt
 for x in plt.rcParams:
@@ -471,10 +473,15 @@ class InteractivePlot(object):
         plt.close(self.fig)
 
 
-def process(f, noplot=False):
+def process(f, noplot=False, lineage_num=None, target="ParB"):
     cell_line = np.load(f)
-    lineage_num = re.search("lineage(\d+)\.npy", f).group(1)
-    InteractivePlot(cell_line, lineage_num, noplot=noplot)
+    if not lineage_num:
+        lineage_num = re.search("lineage(\d+)\.npy", f).group(1)
+
+    if target == "ParB":
+        InteractivePlot(cell_line, lineage_num, noplot=noplot)
+    else:
+        print("Not implemented")
 
 
 def get_path(wildcard=None):
@@ -484,7 +491,24 @@ def get_path(wildcard=None):
     return path
 
 
-def main(noplot=False):
+def main(noplot=False, wanted=True, target="ParB"):
+    if wanted:
+        wantedfile = json.loads(open(
+            "/home/miles/Data/Work/Iria/Dynamics ParAB/wanted.json"
+        ).read())
+        base, subdir = os.path.split(os.getcwd())
+        base = os.path.basename(base)
+        if base in wantedfile and subdir in wantedfile[base]:
+            wantedlineages = [int(x) for x in wantedfile[base][subdir]]
+        else:
+            wantedlineages = None
+    else:
+        wantedlineages = range(100)
+
+    if wantedlineages is None:
+        print("No desired lineages in this directory")
+        return
+
     targetfiles = sorted(glob.glob("data/cell_lines/lineage*.npy"))
     if not targetfiles:
         path = get_path()
@@ -495,8 +519,20 @@ def main(noplot=False):
             print("No files found")
             return
     for targetfile in targetfiles:
-        process(targetfile, noplot=noplot)
+        lineage_num = int(re.search("lineage(\d+)\.npy", targetfile).group(1))
+        if lineage_num in wantedlineages:
+            process(targetfile, noplot=noplot, lineage_num=lineage_num, target=target)
 
 
 if __name__ == "__main__":
-    main()
+    if "-w" in sys.argv:
+        # ignore wanted file
+        wanted = False
+    else:
+        wanted = True
+
+    if "A" in sys.argv:
+        target = "ParA"
+    else:
+        target = "ParB"
+    main(wanted=wanted, target=target)
