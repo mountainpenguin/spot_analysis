@@ -2,6 +2,7 @@
 
 import matplotlib.pyplot as plt
 import matplotlib.gridspec
+import matplotlib.patches
 import glob
 import numpy as np
 import re
@@ -9,6 +10,7 @@ import seaborn as sns
 sns.set_style("white")
 
 from analysis_lib import shared
+from lineage_lib import track
 
 
 def _plot_mesh(ax, mesh):
@@ -51,6 +53,7 @@ def plot_images(cell_line, lineage_num):
     for cell in cell_line:
         # xmin, xmax for each image
         # centre +/- 40
+        cell.centre = track.Lineage.get_mesh_centre(None, cell)
         xmin = cell.centre[0] - 40
         xmax = cell.centre[0] + 40
         ymin = cell.centre[1] - 40
@@ -64,7 +67,7 @@ def plot_images(cell_line, lineage_num):
         # plot ParA in RGB red with white mesh
         ax = fig.add_subplot(gs[1, sp_num:sp_num + 1])
         parA_img = np.dstack((
-            cell.parA_img / np.nanmax(cell.parA_img),
+            cell.parA_img_bg / np.nanmax(cell.parA_img_bg),
             np.zeros(cell.parA_img.shape),
             np.zeros(cell.parA_img.shape)
         ))
@@ -78,7 +81,7 @@ def plot_images(cell_line, lineage_num):
         ax = fig.add_subplot(gs[2, sp_num:sp_num + 1])
         parB_img = np.dstack((
             np.zeros(cell.parB_img.shape),
-            cell.parB_img / np.nanmax(cell.parB_img),
+            cell.parB_img_bg / np.nanmax(cell.parB_img_bg),
             np.zeros(cell.parB_img.shape)
         ))
         ax.imshow(parB_img)
@@ -108,7 +111,9 @@ def plot_images(cell_line, lineage_num):
 
     # save figure
     plt.tight_layout()
-    plt.savefig("data/image-lineage{0:02d}.pdf".format(lineage_num))
+    fn = "data/image-lineage{0:02d}.pdf".format(lineage_num)
+    plt.savefig(fn)
+    print("Saved image file to {0}".format(fn))
     plt.close()
 
 
@@ -194,6 +199,7 @@ def plot_graphs(cell_line, lineage_num):
         x.intensity_mean = s[:, 2].mean()
 
         spotnum += 1
+
     ax.set_ylabel(r"Distance from mid-cell (px)")
     ax.set_xlabel(r"Time (min)")
 
@@ -256,7 +262,10 @@ def plot_graphs(cell_line, lineage_num):
         ax_parA.legend(bbox_to_anchor=(1.65, 1))
 
     plt.tight_layout()
-    plt.savefig("data/data-lineage{0:02d}.pdf".format(lineage_num))
+    fn = "data/data-lineage{0:02d}.pdf".format(lineage_num)
+    plt.savefig(fn)
+    print("Saved data file to {0}".format(fn))
+
     plt.close()
 
 

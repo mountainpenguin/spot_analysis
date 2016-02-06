@@ -148,10 +148,6 @@ class Analysis(track.Lineage):
             xs_r = xs_r[::-1]
             ys_r = ys_r[::-1]
 
-        M_x = (xs_l + xs_r) / 2
-        M_y = (ys_l + ys_r) / 2
-
-        p = scipy.misc.imread(self.phase[frame_idx])
         f = scipy.misc.imread(self.fluor[frame_idx])
         f_denoise = self.process_fluor(f)
 
@@ -187,11 +183,9 @@ class Analysis(track.Lineage):
         # M = np.column_stack((M_x, M_y))
         i = np.array(range(len(F)))
         bg = f.mean()
-        bg2 = f2.mean()
 
         # get peaks
         m = (F - bg).mean() - np.std(F - bg)
-        m2 = (F2 - bg2).mean() - np.std(F2 - bg2)
         # s = np.std(F)
 
         cell.parB_fluorescence_smoothed = F - bg
@@ -322,82 +316,6 @@ class Analysis(track.Lineage):
             ((__[0] / i[-1]) * cell.length[0][0], __[1], cell.length[0][0]) for __ in ParB_vals
         ]
 
-        if self.debug:
-            plt.figure()
-            ax = plt.subplot(231)
-            plt.imshow(p, cmap=plt.cm.gray)
-            # plt.plot(M_x, M_y, "r-")
-            plt.plot(xs_l, ys_l, "w-", lw=0.5)
-            plt.plot(xs_r, ys_r, "w-", lw=0.5)
-#            _ = 0
-#            while _ < xs_l.shape[0]:
-#                plt.plot(
-#                    (xs_l[_], xs_r[_]),
-#                    (ys_l[_], ys_r[_]),
-#                    "y-"
-#                )
-#                _ += 1
-#
-            for p in ParB_vals:
-                x, y = M_x[p[0]], M_y[p[0]]
-                plt.plot(
-                    x, y, "r*"
-                )
-                x, y = M_x[ParA_max[0]], M_y[ParA_max[0]]
-                plt.plot(
-                    x, y, "y*"
-                )
-
-            plt.title("Phase")
-            deaxis()
-
-            plt.subplot(232, sharex=ax, sharey=ax)
-            plt.imshow(f2, cmap=colourmap.cm)
-            plt.plot(xs_l, ys_l, "w-", lw=0.5)
-            plt.plot(xs_r, ys_r, "w-", lw=0.5)
-            x, y = M_x[ParA_max[0]], M_y[ParA_max[0]]
-            plt.plot(
-                x, y, "w*"
-            )
-            plt.title("ParA")
-            deaxis()
-
-            plt.subplot(233, sharex=ax, sharey=ax)
-            plt.imshow(f, cmap=colourmap.cm)
-            plt.plot(xs_l, ys_l, "w-", lw=0.5)
-            plt.plot(xs_r, ys_r, "w-", lw=0.5)
-
-            for p in ParB_vals:
-                x, y = M_x[p[0]], M_y[p[0]]
-                plt.plot(
-                    x, y, "w*"
-                )
-            plt.title("ParB")
-            plt.xlim([0, f.shape[0]])
-            plt.ylim([0, f.shape[1]])
-            deaxis()
-
-            plt.subplot(235)
-            plt.plot(i, F2 - bg2, "k-")
-            plt.plot(i, F2_unsmoothed - bg2, "k-", alpha=0.4)
-            plt.plot(
-                ParA_max[0], ParA_max[1] - bg2, "r."
-            )
-            plt.plot([i[0], i[-1]], [m2, m2])
-
-            plt.subplot(236)
-            plt.plot(i, F - bg, "k-")
-            plt.plot(i, F_unsmoothed - bg, "k-", alpha=0.4)
-            plt.plot([i[0], i[-1]], [m, m])
-            # plt.plot([i[0], i[-1]], [m + s, m + s], "y-")
-
-            for p in ParB_vals:
-                plt.plot(
-                    p[0], p[1], "r."
-                )
-
-            plt.show()
-
         return ParA_val, ParB_vals
 
     def _pole_dist_check(self, pos, arr, clen, threshold=2):
@@ -500,6 +418,8 @@ class Analysis(track.Lineage):
                 parB = scipy.misc.imread(self.fluor[frame_num])
                 parA = scipy.misc.imread(self.fluor2[frame_num])
                 cell_line[sp_num].phase_img = phase
+                cell_line[sp_num].T = self.T
+                cell_line[sp_num].t = t
                 cell_line[sp_num].parB_img = parB
                 cell_line[sp_num].parA_img = parA
 
@@ -616,24 +536,7 @@ class Analysis(track.Lineage):
             cell_line_num += 1
 
 
-if __name__ == "__main__":
-    sns.set_style("white")
-    sns.set_context("talk")
-    if "-d" in sys.argv:
-        debug = True
-    else:
-        debug = False
-
-    if "-s" in sys.argv:
-        skip = False
-    else:
-        skip = True
-
-    if "-n" in sys.argv:
-        noimage = True
-    else:
-        noimage = False
-
+def main(debug, skip, noimage):
     A = Analysis(debug=debug, skip=skip, noimage=noimage)
     A.apply_alignments()
 
@@ -655,21 +558,28 @@ if __name__ == "__main__":
                 break
         cell_lines.append(lin)
 
-#    final_cells = A.frames[-1].cells
-#    cell_lines = []
-#    for f in final_cells:
-#        lin = [f]
-#        while True:
-#            if not f.parent:
-#                break
-#            p = f.parent
-#            p = A.frames.cell(p)
-#            lin.insert(0, p)
-#            f = p
-#        cell_lines.append(lin)
-
     phase = sorted(glob.glob("B/*.tif"))
     parA = sorted(glob.glob("F1/*.tif"))
     parB = sorted(glob.glob("F2/*.tif"))
 
     A.spot_finder(phase, parB, parA, cell_lines)
+
+if __name__ == "__main__":
+    sns.set_style("white")
+    sns.set_context("talk")
+    if "-d" in sys.argv:
+        debug = True
+    else:
+        debug = False
+
+    if "-s" in sys.argv:
+        skip = False
+    else:
+        skip = True
+
+    if "-n" in sys.argv:
+        noimage = True
+    else:
+        noimage = False
+
+    main(debug, skip, noimage)

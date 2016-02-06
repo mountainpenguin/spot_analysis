@@ -15,23 +15,27 @@ import matplotlib.gridspec
 import matplotlib.patches
 import matplotlib.transforms
 
+from lineage_lib import track
 from analysis_lib import shared
 import spot_plot
+import spot_spread
 
 
 class InteractivePlot(object):
-    def __init__(self, cell_line, lineage_num):
+    def __init__(self, cell_line, lineage_num, noplot=False):
+        self.GEN_PLOTS = not noplot
+
         self.parB_path_ind = None
         self.img_plot_targeting_line = None
         self.trace_plot_targeting_lines = []
         self.parB_spots = []
         self.parB_img_spots = []
 
-        self.T = shared.get_timings()
+        self.T = cell_line[0].T
 
         self.grid_spec = matplotlib.gridspec.GridSpec(2, 2)
         self.cell_line = cell_line
-        self.lineage_num = lineage_num
+        self.lineage_num = int(lineage_num)
         self.current_cell = cell_line[0]
         self.current_cell_idx = 0
         self.fig = plt.gcf()
@@ -431,11 +435,11 @@ class InteractivePlot(object):
             return
 
         # backup previous lineage file
-        previous_file = "data/cell_lines/lineage{0}.npy".format(self.lineage_num)
+        previous_file = "data/cell_lines/lineage{0:02d}.npy".format(self.lineage_num)
         if os.path.exists(previous_file):
             if not os.path.exists("data/cell_lines/backups"):
                 os.mkdir("data/cell_lines/backups")
-            backup_file = "data/cell_lines/backups/{0}-lineage{1}.npy".format(
+            backup_file = "data/cell_lines/backups/{0}-lineage{1:02d}.npy".format(
                 datetime.datetime.strftime(datetime.datetime.now(), "%Y%m%d-%H%M"),
                 self.lineage_num
             )
@@ -447,12 +451,13 @@ class InteractivePlot(object):
             print("Backing up previous lineage file to {0}".format(backup_file))
             os.rename(previous_file, backup_file)
 
-            print("Saving new lineage file")
-            np.save(
-                "data/cell_lines/lineage{0}".format(self.lineage_num),
-                self.cell_line
-            )
+        print("Saving new lineage file")
+        np.save(
+            "data/cell_lines/lineage{0:02d}".format(self.lineage_num),
+            self.cell_line
+        )
 
+        if self.GEN_PLOTS:
             print("Saving new PDFs")
             spot_plot.plot_images(self.cell_line, int(self.lineage_num))
             spot_plot.plot_graphs(self.cell_line, int(self.lineage_num))
@@ -463,16 +468,26 @@ class InteractivePlot(object):
         plt.close(self.fig)
 
 
-def process(f):
+def process(f, noplot=False):
     cell_line = np.load(f)
     lineage_num = re.search("lineage(\d+)\.npy", f).group(1)
-    InteractivePlot(cell_line, lineage_num)
+    InteractivePlot(cell_line, lineage_num, noplot=noplot)
 
 
-def main():
+
+
+def main(noplot=False):
     targetfiles = sorted(glob.glob("data/cell_lines/lineage*.npy"))
+    if not targetfiles:
+        path = get_path()
+        if path and os.path.exists(path):
+            os.chdir(path)
+            targetfiles = sorted(glob.glob("data/cell_lines/lineage*.npy"))
+        else:
+            print("No files found")
+            return
     for targetfile in targetfiles:
-        process(targetfile)
+        process(targetfile, noplot=noplot)
 
 
 if __name__ == "__main__":
