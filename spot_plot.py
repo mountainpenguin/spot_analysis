@@ -35,7 +35,9 @@ def _despine(ax=None):
     ax.spines["right"].set_color("none")
     ax.spines["top"].set_color("none")
     ax.xaxis.set_ticks_position("bottom")
+    ax.xaxis.set_label_position("bottom")
     ax.yaxis.set_ticks_position("left")
+    ax.yaxis.set_label_position("left")
 
 
 def _fmt_img(ax, mesh, xlim, ylim):
@@ -123,10 +125,15 @@ def plot_graphs(cell_line, lineage_num):
     fig.patch.set_alpha(0)
 
     spots_ParA = []
+    traces_ParA = []
     L = []
     T = shared.get_timings()
     for cell in cell_line:
         spots_ParA.append(cell.ParA)
+        if cell.orientation:
+            traces_ParA.append(cell.parA_fluorescence_smoothed[::-1])
+        else:
+            traces_ParA.append(cell.parA_fluorescence_smoothed)
         L.append(cell.length[0][0])
     L = np.array(L)
 
@@ -135,8 +142,46 @@ def plot_graphs(cell_line, lineage_num):
     t = np.array(T[start:end + 1])
 
     ax = fig.add_subplot(gs[0, 0])
+    # plot some sort of heatmap like a barchart
+    max_len = max([len(x) for x in traces_ParA])
+    traces = []
+    i = 0
+    for _t in traces_ParA:
+        # pad traces
+        add = (max_len - _t.shape[0]) / 2
+        above = (max_len - _t.shape[0]) // 2
+        if above == add:
+            below = [np.NaN] * above
+            above = [np.NaN] * above
+        else:
+            below = [np.NaN] * (above + 1)
+            above = [np.NaN] * above
+
+        traces.append(np.hstack([above, _t, below]))
+        i += 1
+    traces = np.vstack(traces).T
+
+    sns.heatmap(
+        traces,
+        xticklabels=False,
+        yticklabels=False,
+        vmin=0,
+        cmap=plt.cm.afmhot,
+        linewidths=0,
+        cbar=False,
+    )
+
+    ax = ax.twinx()
     _despine(ax)
+    ax.set_ylabel(r"Distance from mid-cell (px)")
+    ax = ax.twiny()
+    _despine(ax)
+    ax.set_xlabel(r"Time (min)")
     ax.set_title("ParA")
+
+    ax.set_xlim([min(t), max(t)])
+    ax.set_ylim([-max(L/2), max(L/2)])
+
     ax.plot(t, L / 2, "k-", lw=2)
     ax.plot(t, -(L / 2), "k-", lw=2)
 
@@ -148,12 +193,11 @@ def plot_graphs(cell_line, lineage_num):
         parAs[t[i]] = spot
         i += 1
     parAs = np.array(sorted(parAs.items()))
+
     ax.plot(
         parAs[:, 0], parAs[:, 1],
         lw=2, marker=".", mec="k", ms=10
     )
-    ax.set_xlabel(r"Time (min)")
-    ax.set_ylabel(r"Distance from mid-cell (px)")
 
     ax_parA = fig.add_subplot(gs[1, 0])
     _despine(ax_parA)
@@ -173,6 +217,8 @@ def plot_graphs(cell_line, lineage_num):
 
     ax = fig.add_subplot(gs[0, 1])
     _despine(ax)
+    ax.set_xlim([min(t), max(t)])
+    ax.set_ylim([-max(L/2), max(L/2)])
     ax.set_title("ParB")
     ax.plot(t, L / 2, "k-", lw=2, label="Cell poles")
     ax.plot(t, -(L / 2), "k-", lw=2)
