@@ -1,9 +1,92 @@
 #!/usr/bin/env python
 
-from spot_analysis import SpotTimeLapse
 import numpy as np
 import json
 import datetime
+import hashlib
+import random
+import string
+
+
+class SpotTimeLapse(object):
+    def __init__(self, t, p, i, l):
+        self.id = hashlib.sha1("".join([
+            random.choice(
+                string.ascii_letters + string.digits
+            ) for x in range(40)
+        ]).encode("utf8")).hexdigest()
+        self.timing = [t]
+        if p < 0:
+            # bottom pole
+            self.POLE = -1
+        else:
+            self.POLE = 1
+        self.positions = [p]
+        self.intensity = [i]
+        self.lengths = [l]
+
+    def spots(self, adjust=True):
+        if adjust:
+            return np.array([
+                self.timing,
+                self.POLE * np.array(self.positions),
+                self.intensity
+            ]).T
+        else:
+            return np.array([
+                self.timing,
+                self.positions,
+                self.intensity
+            ]).T
+
+    def len(self):
+        return np.array(self.lengths)
+
+    def last(self):
+        return np.array([
+            self.timing[-1], self.positions[-1], self.intensity[-1]
+        ])
+
+    def append(self, t, p, i, l):
+        self.timing.append(t)
+        self.positions.append(p)
+        self.intensity.append(i)
+        self.lengths.append(l)
+
+    def __iadd__(self, other):
+        self.timing.append(other[0])
+        self.positions.append(other[1])
+        self.intensity.append(other[2])
+        self.lengths.append(other[3])
+
+    def __len__(self):
+        return len(self.lengths)
+
+
+def get_parA_path(cell_line, T):
+    start = cell_line[0].frame - 1
+    end = cell_line[-1].frame - 1
+    t = np.array(T[start:end + 1])
+    i = 0
+    for tp in cell_line:
+        pos, inten, celllen = tp.ParA
+        if i == 0:
+            spots_ParA = SpotTimeLapse(
+                t[i],
+                pos - (celllen / 2),
+                inten,
+                celllen,
+            )
+        else:
+            spots_ParA.append(
+                t[i],
+                pos - (celllen / 2),
+                inten,
+                celllen,
+            )
+        i += 1
+    return spots_ParA
+
 
 
 def get_parB_path(cell_line, T):
