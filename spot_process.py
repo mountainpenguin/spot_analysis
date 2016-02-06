@@ -462,8 +462,7 @@ class InteractivePlot(object):
             spot_plot.plot_images(self.cell_line, int(self.lineage_num))
             spot_plot.plot_graphs(self.cell_line, int(self.lineage_num))
 
-            print("Saving new Excel files")
-            print("TODO")
+        spot_spread.gen_xl(self.cell_line, int(self.lineage_num))
 
         plt.close(self.fig)
 

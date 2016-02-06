@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 from lineage_lib import track
-from analysis_lib import colourmap
 from analysis_lib import shared
 import spot_plot
+import spot_spread
 import sys
 import glob
 import matplotlib.pyplot as plt
@@ -445,91 +445,16 @@ class Analysis(track.Lineage):
                 cell_line
             )
 
-            # plot cell lengths with cell-centre at 0
-            L = np.array(L)
-
-            excel_wb = xlwt.Workbook()
-            ws_parA = excel_wb.add_sheet("ParA")
-            ws_parB = excel_wb.add_sheet("ParB")
-
-            ws_parA.write(0, 0, "Time")
-            ws_parA.write(0, 1, "Distance from top pole")
-            ws_parA.write(0, 2, "Distance from midcell")
-            ws_parA.write(0, 3, "Cell length")
-            ws_parB.write(0, 1, "Cell length")
-            ws_parA.write(0, 4, "Spot intensity")
-
-            parAs = {}
-            i = 0
-            for s in S_A:
-                midcell = s[2] / 2
-                spot = s[0] - midcell
-                ws_parA.write(i + 1, 0, int(t[i]))
-                ws_parA.write(i + 1, 1, float(s[0]))
-                ws_parA.write(i + 1, 2, float(spot))
-                ws_parA.write(i + 1, 3, float(s[2]))
-                ws_parB.write(i + 1, 1, float(s[2]))
-                ws_parA.write(i + 1, 4, float(s[1]))
-                parAs[t[i]] = spot
-                i += 1
-
-            spots_ParB = shared.get_parB_path(cell_line, self.T)
-
-            ws_parB.write(0, 0, "Time")
-            i = 1
-            time_dict = {}
-            for time_ in t:
-                ws_parB.write(i, 0, int(time_))
-                time_dict[float(time_)] = i
-                i += 1
-
-            rmax = max(time_dict.values())
-            ws_parB.write(rmax + 2, 0, "Intensity mean:")
-            ws_parB.write(rmax + 3, 0, "Intensity SEM:")
-            ws_parB.write(rmax + 4, 0, "Distance from ParA (mean):")
-            ws_parB.write(rmax + 5, 0, "Distance from ParA (SEM):")
-
-            col = 2
-            spotnum = 1
-            for x in spots_ParB:
-                s = x.spots(False)
-                ws_parB.write(0, col, "Distance from mid-cell (Spot {0})".format(spotnum))
-                ws_parB.write(0, col + 1, "Intensity (Spot {0})".format(spotnum))
-                ws_parB.write(0, col + 2, "Distance from ParA (Spot {0})".format(spotnum))
-
-                dparA = []
-                for spot in s:
-                    r = time_dict[spot[0]]
-                    ws_parB.write(r, col, float(spot[1]))
-                    ws_parB.write(r, col + 1, float(spot[2]))
-                    dpA = spot[1] - parAs[spot[0]]
-                    dparA.append(dpA)
-                    ws_parB.write(r, col + 2, float(dpA))
-
-                # intensity mean and SEM for spot lineage
-                x.intensity_mean = s[:, 2].mean()
-                x.intensity_sem = s[:, 2].std() / np.sqrt(len(s[:, 1]))
-                ws_parB.write(rmax + 2, col + 1, float(x.intensity_mean))
-                ws_parB.write(rmax + 3, col + 1, float(x.intensity_sem))
-
-                # distance from ParA mean and SEM for spot lineage
-                x.parA_d = dparA
-                x.parA_dmean = np.mean(dparA)
-                x.parA_dsem = np.std(dparA) / np.sqrt(len(dparA))
-                x.spotnum = spotnum
-                ws_parB.write(rmax + 4, col + 2, float(x.parA_dmean))
-                ws_parB.write(rmax + 5, col + 2, float(x.parA_dsem))
-
-                col += 3
-                spotnum += 1
-
-            print("Analysed lineage {0}".format(cell_line_num))
+            print("Analysed lineage")
             if not self.NO_IMAGE:
                 spot_plot.plot_images(cell_line, cell_line_num)
-                print("Generated images for lineage {0}".format(cell_line_num))
+                print("Generated images")
                 spot_plot.plot_graphs(cell_line, cell_line_num)
-                print("Generated graphs for lineage {0}".format(cell_line_num))
-            excel_wb.save("data/lineage{0:02d}.xls".format(cell_line_num))
+                print("Generated graphs")
+
+            spot_spread.gen_xl(cell_line, cell_line_num)
+            print("Generated Excel files")
+
             print("Processed cell lineage {0} of {1}".format(
                 cell_line_num, len(cell_lines)
             ))
