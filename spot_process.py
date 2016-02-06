@@ -193,7 +193,8 @@ class InteractivePlot(object):
         self.img_plot.plot(self.current_cell.mesh[:, 0], self.current_cell.mesh[:, 1], "k-")
         self.img_plot.plot(self.current_cell.mesh[:, 2], self.current_cell.mesh[:, 3], "k-")
 
-        centre = self.current_cell.centre
+        # centre = self.current_cell.centre
+        centre = track.Lineage.get_mesh_centre(None, self.current_cell)
         rang = 40
         xmin = centre[0] - rang
         xmax = centre[0] + rang
