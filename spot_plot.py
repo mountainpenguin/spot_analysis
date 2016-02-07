@@ -152,7 +152,7 @@ def plot_graphs(cell_line, lineage_num):
     T = shared.get_timings()
     for cell in cell_line:
         spots_ParA.append(cell.ParA)
-        traces_ParA.append(cell.parA_fluorescence_smoothed)
+        traces_ParA.append(cell.parA_fluorescence_smoothed[::-1])
         L.append(cell.length[0][0])
     L = np.array(L)
 
