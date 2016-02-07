@@ -292,7 +292,7 @@ class InteractivePlot(object):
             )
             self.par_img_spots.append(pb)
 
-            intensity = self.current_cell.parB_fluorescence_smoothed[xpos]
+            intensity = self.get_fluor_smoothed()[xpos]
             self.current_cell.ParB.append(
                 (xpos, intensity, self.current_cell.length[0][0])
             )
@@ -537,6 +537,7 @@ class InteractivePlotA(InteractivePlot):
         ("Enter", "Next cell", "enter"),
         ("t", "Replace Mode", "t"),
     ]
+
     def determine_par_path(self):
         # get ParA path
         self.spots = shared.get_parA_path(self.cell_line, self.T)
@@ -565,6 +566,7 @@ class InteractivePlotB(InteractivePlot):
         ("a", "Add Mode", "a"),
         ("r", "Remove Mode", "r"),
     ]
+
     def determine_par_path(self):
         self.spots = shared.get_parB_path(self.cell_line, self.T)
 
