@@ -31,6 +31,12 @@ def main():
             ys_l = cell.mesh[:, 1]
             xs_r = cell.mesh[:, 2]
             ys_r = cell.mesh[:, 3]
+            if not cell.orientation:
+                xs_l = xs_l[::-1]
+                ys_l = ys_l[::-1]
+                xs_r = xs_r[::-1]
+                ys_r = ys_r[::-1]
+
             mesh = xs_l, xs_r, ys_l, ys_r
 
             _, _, F2, F2_unsmoothed = Analysis.get_fluor_for_rib(
