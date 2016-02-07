@@ -179,7 +179,7 @@ def plot_graphs(cell_line, lineage_num):
     ax.set_xlabel(r"Time (min)")
     ax.set_title("ParA")
 
-    ax.set_xlim([min(t), max(t)])
+    ax.set_xlim([min(t) - 8, max(t) + 7])
     ax.set_ylim([-max(L/2), max(L/2)])
 
     ax.plot(t, L / 2, "k-", lw=2)
@@ -217,7 +217,7 @@ def plot_graphs(cell_line, lineage_num):
 
     ax = fig.add_subplot(gs[0, 1])
     _despine(ax)
-    ax.set_xlim([min(t), max(t)])
+    ax.set_xlim([min(t) - 8, max(t) + 7])
     ax.set_ylim([-max(L/2), max(L/2)])
     ax.set_title("ParB")
     ax.plot(t, L / 2, "k-", lw=2, label="Cell poles")
