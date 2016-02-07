@@ -61,6 +61,28 @@ def plot_images(cell_line, lineage_num):
         ymin = cell.centre[1] - 40
         ymax = cell.centre[1] + 40
 
+        xs = np.concatenate([
+            cell.mesh[:, 0],
+            cell.mesh[:, 2]
+        ])
+        ys = np.concatenate([
+            cell.mesh[:, 1],
+            cell.mesh[:, 2]
+        ])
+        xdis = xs - xmin
+        if np.any(xdis < 0):
+            xmin += xdis.min() - 5
+        xdas = xmax - xs
+        if np.any(xdas < 0):
+            xmax += -xdas.min() + 5
+
+        ydis = ys - ymin
+        if np.any(ydis < 0):
+            ymin += ydis.min() - 5
+        ydas = ymax - ys
+        if np.any(ydas < 0):
+            ymax += -ydas.min() + 5
+
         # plot phase in gray with white mesh
         ax = fig.add_subplot(gs[0, sp_num:sp_num + 1])
         ax.imshow(cell.phase_img, cmap=plt.cm.gray)
