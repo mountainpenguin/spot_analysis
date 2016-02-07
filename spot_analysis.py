@@ -188,6 +188,8 @@ class Analysis(track.Lineage):
         m = (F - bg).mean() - np.std(F - bg)
         # s = np.std(F)
 
+        cell.parA_fluorescence_smoothed = F2 - f2.mean()
+        cell.parA_fluorescence_unsmoothed = F_unsmoothed - f2.mean()
         cell.parB_fluorescence_smoothed = F - bg
         cell.parB_fluorescence_unsmoothed = F_unsmoothed - bg
 

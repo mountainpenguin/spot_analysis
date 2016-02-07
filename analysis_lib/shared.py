@@ -85,8 +85,7 @@ def get_parA_path(cell_line, T):
                 celllen,
             )
         i += 1
-    return spots_ParA
-
+    return [spots_ParA]
 
 
 def get_parB_path(cell_line, T):

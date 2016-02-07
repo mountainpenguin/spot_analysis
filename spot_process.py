@@ -25,14 +25,30 @@ import spot_spread
 
 
 class InteractivePlot(object):
+    MODE_ADD = [
+        ("ESC", "Discard changes", "escape"),
+        ("Enter", "Accept changes", "enter"),
+        ("Click", "Add new spot", ""),
+    ]
+    MODE_REMOVE = [
+        ("ESC", "Discard changes", "escape"),
+        ("Enter", "Accept changes", "enter"),
+        ("Click", "Remove spot", ""),
+    ]
+    MODE_REPLACE = [
+        ("ESC", "Discard changes", "escape"),
+        ("Enter", "Accept changes", "enter"),
+        ("Click", "Replace spot", ""),
+    ]
+
     def __init__(self, cell_line, lineage_num, noplot=False):
         self.GEN_PLOTS = not noplot
 
-        self.parB_path_ind = None
+        self.par_path_ind = None
         self.img_plot_targeting_line = None
         self.trace_plot_targeting_lines = []
-        self.parB_spots = []
-        self.parB_img_spots = []
+        self.par_spots = []
+        self.par_img_spots = []
 
         self.T = cell_line[0].T
 
@@ -48,7 +64,7 @@ class InteractivePlot(object):
         self.img_plot = self.fig.add_subplot(self.grid_spec[0, 0])
         self.trace_plot = self.fig.add_subplot(self.grid_spec[1, 0])
         self.status_plot = self.fig.add_subplot(self.grid_spec[0, 1])
-        self.parB_plot = self.fig.add_subplot(self.grid_spec[1, 1])
+        self.par_plot = self.fig.add_subplot(self.grid_spec[1, 1])
 
         self._decorate()
 
@@ -58,7 +74,7 @@ class InteractivePlot(object):
         self.fig.canvas.mpl_connect("button_release_event", self.button_release_event)
 
         self.draw_cell()
-        self.update_parB_time_indicator()
+        self.update_par_time_indicator()
         self.MODE = "default"
         self.mode_default()
         plt.show()
@@ -82,32 +98,22 @@ class InteractivePlot(object):
         self._deaxis(self.img_plot)
         self._despine(self.trace_plot)
         self._deaxis(self.status_plot)
-        self._despine(self.parB_plot)
+        self._despine(self.par_plot)
 
     def update_status(self):
         self.status_plot.clear()
         self._deaxis(self.status_plot)
         if self.MODE == "default":
-            bindings = [
-                ("ESC", "Discard lineage"),
-                ("Enter", "Next cell"),
-                ("a", "Add Mode"),
-                ("r", "Remove Mode"),
-            ]
+            self.bindings = self.MODE_DEFAULT
 
         elif self.MODE == "add":
-            bindings = [
-                ("ESC", "Discard changes"),
-                ("Enter", "Accept changes"),
-                ("Click", "Add new ParB spot"),
-            ]
+            self.bindings = self.MODE_ADD
 
         elif self.MODE == "remove":
-            bindings = [
-                ("ESC", "Discard changes"),
-                ("Enter", "Accept changes"),
-                ("Click", "Remove ParB spot"),
-            ]
+            self.bindings = self.MODE_REMOVE
+
+        elif self.MODE == "replace":
+            self.bindings = self.MODE_REPLACE
 
         col1 = [
             "Lineage:",
@@ -121,7 +127,7 @@ class InteractivePlot(object):
             "",
             "",
         ]
-        for k, v in bindings:
+        for k, v, _ in self.bindings:
             col1.append(k)
             col2.append(v)
 
@@ -156,9 +162,9 @@ class InteractivePlot(object):
         # provide instructions on status_plot
         self.fig.suptitle("Default Mode")
         self.update_status()
-        self.draw_parB()
-        self.determine_parB_path()
-        self.draw_parB_path()
+        self.draw_par()
+        self.determine_par_path()
+        self.draw_par_path()
         self.redraw()
 
     def mode_add(self):
@@ -167,13 +173,13 @@ class InteractivePlot(object):
         self.fig.suptitle("Add Mode")
         self.update_status()
 
-        # fade existing ParB spots
-        for x in self.parB_spots:
+        # fade existing Par spots
+        for x in self.par_spots:
             x.set_color("b")
             x.set_alpha(0.8)
 
-        # store current ParB spots as backup
-        self.ParB_backup = list(self.current_cell.ParB)
+        # store current Par spots as backup
+        self.Par_backup = list(self.get_par())
         self.redraw()
 
     def mode_remove(self):
@@ -182,18 +188,29 @@ class InteractivePlot(object):
         self.fig.suptitle("Remove Mode")
         self.update_status()
 
-        # re-colour existing ParB spots
-        for x in self.parB_spots:
+        # re-colour existing Par spots
+        for x in self.par_spots:
             x.set_color("b")
 
-        # backup current ParB spots
-        self.ParB_backup = list(self.current_cell.ParB)
+        # backup current Par spots
+        self.Par_backup = list(self.get_par())
+        self.redraw()
+
+    def mode_replace(self):
+        self.MODE = "replace"
+        self.fig.suptitle("Replace Mode")
+        self.update_status()
+
+        for x in self.par_spots:
+            x.set_color("b")
+
+        self.Par_backup = list(self.get_par())
         self.redraw()
 
     def draw_cell(self):
-        parB_img = self.current_cell.parB_img_bg
-        parB_img[np.isnan(parB_img)] = 0
-        self.img_plot.imshow(parB_img, cmap=plt.cm.viridis)
+        img = self.get_img()
+        img[np.isnan(img)] = 0
+        self.img_plot.imshow(img, cmap=plt.cm.viridis)
         self.img_plot.plot(self.current_cell.mesh[:, 0], self.current_cell.mesh[:, 1], "k-")
         self.img_plot.plot(self.current_cell.mesh[:, 2], self.current_cell.mesh[:, 3], "k-")
 
@@ -207,14 +224,16 @@ class InteractivePlot(object):
         self.img_plot.set_xlim([xmin, xmax])
         self.img_plot.set_ylim([ymin, ymax])
 
+        smoothed = self.get_fluor_smoothed()
+        unsmoothed = self.get_fluor_unsmoothed()
         self.trace_plot.plot(
-            range(len(self.current_cell.parB_fluorescence_unsmoothed)),
-            self.current_cell.parB_fluorescence_unsmoothed,
+            range(len(unsmoothed)),
+            unsmoothed,
             "k-", alpha=0.4, lw=2
         )
         self.trace_plot.plot(
-            range(len(self.current_cell.parB_fluorescence_smoothed)),
-            self.current_cell.parB_fluorescence_smoothed,
+            range(len(smoothed)),
+            smoothed,
             "k-", lw=2
         )
         self.redraw()
@@ -229,7 +248,7 @@ class InteractivePlot(object):
         self.img_plot.clear()
         self.trace_plot.clear()
         self.update_status()
-        self.update_parB_time_indicator()
+        self.update_par_time_indicator()
         self._decorate()
         self.draw_cell()
         self.mode_default()
@@ -253,11 +272,11 @@ class InteractivePlot(object):
                 img_x, img_y,
                 marker="o", ms=10, mec="r", mew=2, mfc="none"
             )
-            self.parB_img_spots.append(pb)
+            self.par_img_spots.append(pb)
 
-            # recalculate parB lines
-            self.determine_parB_path()
-            self.draw_parB_path()
+            # recalculate par lines
+            self.determine_par_path()
+            self.draw_par_path()
 
             self.redraw()
 
@@ -271,25 +290,50 @@ class InteractivePlot(object):
             pb, = self.img_plot.plot(
                 x1pos, y1pos, marker=".", ms=10, mec="r", mew=2, mfc="none"
             )
-            self.parB_img_spots.append(pb)
+            self.par_img_spots.append(pb)
 
             intensity = self.current_cell.parB_fluorescence_smoothed[xpos]
             self.current_cell.ParB.append(
                 (xpos, intensity, self.current_cell.length[0][0])
             )
-            self.determine_parB_path()
-            self.draw_parB_path()
+            self.determine_par_path()
+            self.draw_par_path()
             pb, = self.trace_plot.plot(xpos, intensity, "r.", ms=10)
             pb.set_picker(5)
             pb.spot_id = xpos * intensity
             pb.img_x = x1pos
             pb.img_y = y1pos
-            self.parB_spots.append(pb)
+            self.par_spots.append(pb)
 
+            self.redraw()
+        if self.MODE == "replace" and event.button == 1 and event.inaxes == self.trace_plot:
+            # remove existing ParA spot
+            # add new spot
+            # update par paths
+            xpos = event.xdata
+            x1pos, y1pos = self.current_cell.M_x[xpos], self.current_cell.M_y[xpos]
+            pb, = self.img_plot.plot(
+                x1pos, y1pos, marker=".", ms=10, mec="r", mew=2, mfc="none"
+            )
+            self.par_img_spots.append(pb)
+
+            intensity = self.current_cell.parA_fluorescence_smoothed[xpos]
+            # hack for incorrect parA stuff
+            self.current_cell.ParA = (
+                xpos,
+                intensity + self.current_cell.parA_img.mean(),
+                self.current_cell.length[0][0]
+            )
+            self.determine_par_path()
+            self.draw_par_path()
+            pb, = self.trace_plot.plot(xpos, intensity, "r.", ms=10)
+            self.par_spots.append(pb)
             self.redraw()
 
     def key_press_event(self, event):
         if self.MODE == "default":
+            if event.key not in [x[2] for x in self.bindings]:
+                return
             if event.key == "enter":
                 self.next()
             elif event.key == "escape":
@@ -298,10 +342,13 @@ class InteractivePlot(object):
                 self.mode_add()
             elif event.key == "r":
                 self.mode_remove()
+            elif event.key == "t":
+                self.mode_replace()
+
         elif self.MODE == "add":
             if event.key == "escape":
                 # discard changes
-                self.current_cell.ParB = list(self.ParB_backup)
+                self.discard()
                 self.clear_targeting_lines()
                 self.mode_default()
             elif event.key == "enter":
@@ -313,20 +360,30 @@ class InteractivePlot(object):
         elif self.MODE == "remove":
             if event.key == "escape":
                 # discard changes
-                self.current_cell.ParB = list(self.ParB_backup)
+                self.discard()
                 self.mode_default()
             elif event.key == "enter":
                 self.mode_default()
+        elif self.MODE == "replace":
+            if event.key == "escape":
+                self.discard()
+                self.clear_targeting_lines()
+                self.mode_default()
+            elif event.key == "enter":
+                self.clear_targeting_lines()
+                self.mode_default()
+
         else:
             if event.key == "escape":
                 self.clear_targeting_lines()
                 self.mode_default()
 
     def motion_notify_event(self, event):
-        if self.MODE == "add" and event.inaxes == self.trace_plot:
+        if (self.MODE == "add" or self.MODE == "replace") and event.inaxes == self.trace_plot:
             xpos = event.xdata
             try:
-                ytarget = self.current_cell.parB_fluorescence_smoothed[xpos]
+                fluor = self.get_fluor_smoothed()
+                ytarget = fluor[xpos]
             except:
                 return
 
@@ -366,67 +423,67 @@ class InteractivePlot(object):
                     pass
         self.trace_plot_targeting_lines = []
 
-    def draw_parB(self):
-        for x in self.parB_spots:
+    def draw_par(self):
+        for x in self.par_spots:
             try:
                 self.trace_plot.lines.remove(x)
             except:
                 pass
 
-        for x in self.parB_img_spots:
+        for x in self.par_img_spots:
             try:
                 self.img_plot.lines.remove(x)
             except:
                 pass
 
-        self.parB_spots = []
-        self.parB_img_spots = []
+        self.par_spots = []
+        self.par_img_spots = []
 
-        for parB in self.current_cell.ParB:
-            img_x, img_y = self.current_cell.M_x[parB[0]], self.current_cell.M_y[parB[0]]
+        for par in self.get_par():
+            img_x, img_y = self.current_cell.M_x[par[0]], self.current_cell.M_y[par[0]]
             pb, = self.img_plot.plot(img_x, img_y, marker="o", ms=10, mec="b", mew=2, mfc="none")
-            self.parB_img_spots.append(pb)
+            self.par_img_spots.append(pb)
 
-            trace_x, trace_y = parB[0], parB[1]
+            trace_x, trace_y = par[0], par[1]
+            # hack for incorrect ParA value
+            if self.TARGET == "A":
+                trace_y = trace_y - self.get_img().mean()
             pb, = self.trace_plot.plot(trace_x, trace_y, "r.", ms=10)
             pb.set_picker(5)
-            pb.spot_id = parB[0] * parB[1]
+            pb.spot_id = par[0] * par[1]
             pb.img_x = img_x
             pb.img_y = img_y
-            self.parB_spots.append(pb)
+            self.par_spots.append(pb)
         self.redraw()
 
-    def draw_parB_path(self):
-        self.parB_plot.clear()
-        self._despine(self.parB_plot)
-        self.update_parB_time_indicator()
+    def draw_par_path(self):
+        self.par_plot.clear()
+        self._despine(self.par_plot)
+        self.update_par_time_indicator()
         spotnum = 1
-        for x in self.spots_ParB:
+        for x in self.spots:
             s = x.spots(False)
-            self.parB_plot.plot(
+            self.par_plot.plot(
                 s[:, 0], s[:, 1],
                 lw=2, marker=".", mec="k",
                 ms=10, label="Spot {0}".format(spotnum)
             )
             spotnum += 1
 
-    def determine_parB_path(self):
-        self.spots_ParB = shared.get_parB_path(self.cell_line, self.T)
-
-    def update_parB_time_indicator(self):
-        if self.parB_path_ind:
+    def update_par_time_indicator(self):
+        if self.par_path_ind:
             try:
-                self.parB_plot.lines.remove(
-                    self.parB_path_ind
+                self.par_plot.lines.remove(
+                    self.par_path_ind
                 )
             except:
                 pass
         x = self.T[self.current_cell.frame - 1]
 
         trans = matplotlib.transforms.blended_transform_factory(
-            self.parB_plot.transData, self.parB_plot.transAxes
+            self.par_plot.transData, self.par_plot.transAxes
         )
-        self.parB_path_ind, = self.parB_plot.plot(
+        self.par_path_ind, = self.par_plot.plot(
             [x, x], [0, 1], "k-",
             alpha=0.4,
             transform=trans
@@ -473,13 +530,69 @@ class InteractivePlot(object):
         plt.close(self.fig)
 
 
+class InteractivePlotA(InteractivePlot):
+    TARGET = "A"
+    MODE_DEFAULT = [
+        ("ESC", "Discard lineage", "escape"),
+        ("Enter", "Next cell", "enter"),
+        ("t", "Replace Mode", "t"),
+    ]
+    def determine_par_path(self):
+        # get ParA path
+        self.spots = shared.get_parA_path(self.cell_line, self.T)
+
+    def get_img(self):
+        return self.current_cell.parA_img
+
+    def get_fluor_smoothed(self):
+        return self.current_cell.parA_fluorescence_smoothed
+
+    def get_fluor_unsmoothed(self):
+        return self.current_cell.parA_fluorescence_unsmoothed
+
+    def get_par(self):
+        return [self.current_cell.ParA]
+
+    def discard(self):
+        self.current_cell.ParA = list(self.Par_backup)[0]
+
+
+class InteractivePlotB(InteractivePlot):
+    TARGET = "B"
+    MODE_DEFAULT = [
+        ("ESC", "Discard lineage", "escape"),
+        ("Enter", "Next cell", "enter"),
+        ("a", "Add Mode", "a"),
+        ("r", "Remove Mode", "r"),
+    ]
+    def determine_par_path(self):
+        self.spots = shared.get_parB_path(self.cell_line, self.T)
+
+    def get_img(self):
+        return self.current_cell.parB_img
+
+    def get_fluor_smoothed(self):
+        return self.current_cell.parB_fluorescence_smoothed
+
+    def get_fluor_unsmoothed(self):
+        return self.current_cell.parB_fluorescence_unsmoothed
+
+    def get_par(self):
+        return self.current_cell.ParB
+
+    def discard(self):
+        self.current_cell.ParB = list(self.Par_backup)
+
+
 def process(f, noplot=False, lineage_num=None, target="ParB"):
     cell_line = np.load(f)
     if not lineage_num:
         lineage_num = re.search("lineage(\d+)\.npy", f).group(1)
 
     if target == "ParB":
-        InteractivePlot(cell_line, lineage_num, noplot=noplot)
+        InteractivePlotB(cell_line, lineage_num, noplot=noplot)
+    elif target == "ParA":
+        InteractivePlotA(cell_line, lineage_num, noplot=noplot)
     else:
         print("Not implemented")
 
@@ -494,7 +607,7 @@ def get_path(wildcard=None):
 def main(noplot=False, wanted=True, target="ParB"):
     if wanted:
         wantedfile = json.loads(open(
-            "/home/miles/Data/Work/Iria/Dynamics ParAB/wanted.json"
+            "../../wanted.json"
         ).read())
         base, subdir = os.path.split(os.getcwd())
         base = os.path.basename(base)
@@ -531,7 +644,7 @@ if __name__ == "__main__":
     else:
         wanted = True
 
-    if "A" in sys.argv:
+    if "A" in sys.argv or "a" in sys.argv:
         target = "ParA"
     else:
         target = "ParB"
