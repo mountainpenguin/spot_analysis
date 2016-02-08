@@ -472,33 +472,25 @@ class InteractivePlot(object):
             )
             spotnum += 1
 
-#        parent_id = self.cell_line[0].parent
+        # plot lengths
+        length_data = np.array([
+            (x.length[0][0] / 2, -(x.length[0][0] / 2))
+            for x in self.cell_line
+        ])
+        self.par_plot.plot(
+            self.current_cell.t, length_data[:, 0],
+            "k-", lw=2,
+        )
+        self.par_plot.plot(
+            self.current_cell.t, length_data[:, 1],
+            "k-", lw=2,
+        )
 
-        # plot approximate division site
-        children_ids = self.cell_line[-1].children
-        if children_ids:
-            # get info for id
-            child1 = self.lineage.frames.cell(children_ids[0])
-            child2 = self.lineage.frames.cell(children_ids[1])
-
-            ldiff = (child1.length[0][0] + child2.length[0][0] -
-                     self.cell_line[-1].length[0][0])
-            print(self.cell_line[-1].length[0][0])
-            print(ldiff)
-            # draw patch
-            t = self.T[self.cell_line[-1].frame]
-            print("t:", t)
-            lowerleft_x = t
-            cell1 = matplotlib.patches.Rectangle(
-                (lowerleft_x, lowerleft_y),
-                width=15,
-                height=child1.length[0][0],
-                capstyle="round",
-                fill=False,
-                edgecolor="k",
-                linewidth=2,
-            )
-
+        spot_plot.decorate_daughters(
+            self.cell_line, self.lineage,
+            self.par_plot, pad=5
+        )
+        self.redraw()
 
     def update_par_time_indicator(self):
         if self.par_path_ind:

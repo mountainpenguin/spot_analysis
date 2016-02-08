@@ -141,7 +141,109 @@ def plot_images(cell_line, lineage_num):
     plt.close()
 
 
+def decorate_daughters(cell_line, lineage, ax, pad=10):
+    parent_cell = cell_line[-1]
+
+    # plot approximate division site
+    children_ids = parent_cell.children
+    if children_ids:
+        # get info for id
+        child1 = lineage.frames.cell(children_ids[0])
+        child2 = lineage.frames.cell(children_ids[1])
+
+        ldiff = (child1.length[0][0] + child2.length[0][0] -
+                    parent_cell.length[0][0])
+
+        # determine which pole each child corresponds to
+        # for cell1/cell2 assignment
+        if parent_cell.orientation:
+            parent_pupper = parent_cell.mesh[0]
+        else:
+            parent_pupper = parent_cell.mesh[-1]
+
+        child1_pupper = child1.mesh[0]
+        child1_plower = child1.mesh[-1]
+
+        child2_pupper = child2.mesh[0]
+        child2_plower = child2.mesh[-1]
+
+        child1_dist = np.min([
+            np.abs(np.sum(parent_pupper - child1_pupper)),
+            np.abs(np.sum(parent_pupper - child1_plower)),
+        ])
+        child2_dist = np.min([
+            np.abs(np.sum(parent_pupper - child2_pupper)),
+            np.abs(np.sum(parent_pupper - child2_plower)),
+        ])
+        if child1_dist < child2_dist:
+            child1 = lineage.frames.cell(children_ids[1])
+            child2 = lineage.frames.cell(children_ids[0])
+
+        # width should be approx. an 18th of the total xrange
+        width = (cell_line[0].t[-1] - cell_line[0].t[0]) / 18
+
+        shared_params = {
+            "width": width,
+            "boxstyle": matplotlib.patches.BoxStyle.Round(
+                pad=0, rounding_size=width / 2
+            ),
+            "fill": False,
+            "edgecolor": "k",
+            "linewidth": 2,
+        }
+
+        lowerleft_x = cell_line[0].t[-1] + pad
+        # lowest point of last cell - ldiff/2
+        # lowest point = -(L[-1] / 2 )
+        lowerleft_y1 = -(parent_cell.length[0][0] / 2) - (ldiff / 2)
+        cell1 = matplotlib.patches.FancyBboxPatch(
+            (lowerleft_x, lowerleft_y1),
+            height=child1.length[0][0],
+            **shared_params
+        )
+        # highest point of child1
+        # i.e. lowerleft_y1 + height
+        lowerleft_y2 = lowerleft_y1 + child1.length[0][0]
+        cell2 = matplotlib.patches.FancyBboxPatch(
+            (lowerleft_x, lowerleft_y2),
+            height=child2.length[0][0],
+            **shared_params
+        )
+        ax.add_patch(cell1)
+        ax.add_patch(cell2)
+
+        ylim = np.max([
+            child1.length[0][0] + child2.length[0][0],
+            parent_cell.length[0][0]
+        ]) + 2
+
+        _plot_limits(
+            ax,
+            (
+                cell_line[0].t[0] - 8,
+                cell_line[0].t[-1] + 2 + pad + width
+            ),
+            (
+                -(ylim / 2),
+                ylim / 2
+            )
+        )
+    else:
+        _plot_limits(
+            ax,
+            (
+                min(cell_line[0].t) - 8,
+                max(cell_line[0].t) + 7
+            ),
+            (
+                -(parent_cell.length / 2) - 1,
+                parent_cell.length / 2 + 1
+            )
+        )
+
+
 def plot_graphs(cell_line, lineage_num):
+    lineage = track.Lineage()
     fig = plt.figure(figsize=(20, 10))
     gs = matplotlib.gridspec.GridSpec(2, 3)
     fig.patch.set_alpha(0)
@@ -198,8 +300,6 @@ def plot_graphs(cell_line, lineage_num):
     ax.set_xlabel(r"Time (min)")
     ax.set_title("ParA")
 
-    ax.set_xlim([min(t) - 8, max(t) + 7])
-    ax.set_ylim([-max(L/2), max(L/2)])
 
     ax.plot(t, L / 2, "k-", lw=2)
     ax.plot(t, -(L / 2), "k-", lw=2)
@@ -217,6 +317,8 @@ def plot_graphs(cell_line, lineage_num):
         parAs[:, 0], parAs[:, 1],
         lw=2, marker=".", mec="k", ms=10
     )
+
+    decorate_daughters(cell_line, lineage, ax)
 
     ax_parA = fig.add_subplot(gs[1, 0])
     _despine(ax_parA)
@@ -236,8 +338,6 @@ def plot_graphs(cell_line, lineage_num):
 
     ax = fig.add_subplot(gs[0, 1])
     _despine(ax)
-    ax.set_xlim([min(t) - 8, max(t) + 7])
-    ax.set_ylim([-max(L/2), max(L/2)])
     ax.set_title("ParB")
     ax.plot(t, L / 2, "k-", lw=2, label="Cell poles")
     ax.plot(t, -(L / 2), "k-", lw=2)
@@ -267,6 +367,8 @@ def plot_graphs(cell_line, lineage_num):
 
     ax.set_ylabel(r"Distance from mid-cell (px)")
     ax.set_xlabel(r"Time (min)")
+
+    decorate_daughters(cell_line, lineage, ax, pad=5)
 
     ax.legend(bbox_to_anchor=(1.35, 1))
 
