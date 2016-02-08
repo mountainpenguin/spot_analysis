@@ -258,45 +258,43 @@ def plot_graphs(cell_line, lineage_num):
         L.append(cell.length[0][0])
     L = np.array(L)
 
+    traces_ParA = np.concatenate(traces_ParA)
+    max_parA_intensity = traces_ParA.max()
+
     start = cell_line[0].frame - 1
     end = cell_line[-1].frame - 1
     t = np.array(T[start:end + 1])
 
     ax = fig.add_subplot(gs[0, 0])
-    # plot some sort of heatmap like a barchart
-    max_len = max([len(x) for x in traces_ParA])
-    traces = []
+    _despine(ax)
+    # use Rectangles to generate a heatmap
     i = 0
-    for _t in traces_ParA:
-        # pad traces
-        add = (max_len - _t.shape[0]) / 2
-        above = (max_len - _t.shape[0]) // 2
-        if above == add:
-            below = [np.NaN] * above
-            above = [np.NaN] * above
-        else:
-            below = [np.NaN] * (above + 1)
-            above = [np.NaN] * above
-
-        traces.append(np.hstack([above, _t, below]))
+    cmapper = plt.cm.get_cmap("afmhot")
+    for cell in cell_line:
+        trace = cell.parA_fluorescence_smoothed
+        l = cell.length[0][0]
+        x0 = t[i] - 8
+        y0 = -(cell.length[0][0] / 2)
+        increment = cell.length[0][0] / len(trace)
+        colours = cmapper(trace / max_parA_intensity)
+        i2 = 0
+        for _t in trace:
+            if _t < 0:
+                _t = 0
+            r = matplotlib.patches.Rectangle(
+                (x0, y0),
+                width=15,
+                height=increment,
+#                facecolor=str(_t / max_parA_intensity),
+                facecolor=colours[i2],
+                edgecolor="none",
+            )
+            ax.add_patch(r)
+            y0 += increment
+            i2 += 1
         i += 1
-    traces = np.vstack(traces).T
 
-    sns.heatmap(
-        traces,
-        xticklabels=False,
-        yticklabels=False,
-        vmin=0,
-        cmap=plt.cm.afmhot,
-        linewidths=0,
-        cbar=False,
-    )
-
-    ax = ax.twinx()
-    _despine(ax)
     ax.set_ylabel(r"Distance from mid-cell (px)")
-    ax = ax.twiny()
-    _despine(ax)
     ax.set_xlabel(r"Time (min)")
     ax.set_title("ParA")
 
