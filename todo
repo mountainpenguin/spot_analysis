@@ -1,3 +1,3 @@
-- plot parA/parB position in parent cell at start of lineage (images and graphs)
 - plot division site in graphs at end of lineage (images and graphs)
+- plot parA/parB position in parent cell at start of lineage (images and graphs)
 - fix ParB spot 'lineages'
