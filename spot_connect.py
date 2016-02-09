@@ -78,7 +78,6 @@ class Connector(object):
 
     def plot_parB(self):
         colourwheel = sns.color_palette("husl", len(self.spots))
-        self.par_plot.clear()
         spotnum = 1
         for x in self.spots:
             colour = colourwheel[spotnum - 1]
@@ -114,6 +113,7 @@ class Connector(object):
 
                 index += 1
             spotnum += 1
+        self.par_plot.patch.set_alpha(0)
 
     def pick_event(self, event):
         if not self.MODE:
