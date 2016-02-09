@@ -9,6 +9,8 @@ import re
 import seaborn as sns
 sns.set_style("white")
 import sys
+import json
+import os
 
 from analysis_lib import shared
 from lineage_lib import track
@@ -482,17 +484,38 @@ def plot_graphs(cell_line, lineage_num, num_plots=5):
     plt.close()
 
 
-if __name__ == "__main__":
+def main():
+    if "-w" in sys.argv:
+        wantedlineages = range(100)
+    else:
+        wantedfile = json.loads(open(
+            "../../wanted.json"
+        ).read())
+        base, subdir = os.path.split(os.getcwd())
+        base = os.path.basename(base)
+        if base in wantedfile and subdir in wantedfile[base]:
+            wantedlineages = [int(x) for x in wantedfile[base][subdir]]
+        else:
+            wantedlineages = None
+
     num_plots = 5
     for x in sys.argv:
         if "-n" in x:
             num_plots = int(x.split("-n")[1])
             break
 
+    if wantedlineages is None:
+        print("No desired lineages in this directory")
+        return
+
     targetfiles = sorted(glob.glob("data/cell_lines/lineage*.npy"))
     for targetfile in targetfiles:
         cell_line = np.load(targetfile)
         lineage_num = int(re.search("lineage(\d+)\.npy", targetfile).group(1))
-        plot_images(cell_line, lineage_num)
-        plot_graphs(cell_line, lineage_num)
-        print("Generated plots for lineage {0}".format(lineage_num))
+        if lineage_num in wantedlineages:
+            plot_images(cell_line, lineage_num)
+            plot_graphs(cell_line, lineage_num, num_plots=num_plots)
+            print("Generated plots for lineage {0}".format(lineage_num))
+
+if __name__ == "__main__":
+    main()
