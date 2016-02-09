@@ -474,7 +474,6 @@ def plot_graphs(cell_line, lineage_num, num_plots=5):
         else:
             ax_parA.legend(bbox_to_anchor=(1.65, 1))
 
-
     plt.tight_layout()
     fn = "data/data-lineage{0:02d}.pdf".format(lineage_num)
     plt.savefig(fn)
