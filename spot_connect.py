@@ -132,22 +132,27 @@ class Connector(object):
             print("todo")
 
     def motion_notify_event(self, event):
-        if self.MODE == 1:
+        if self.MODE == 1 or self.MODE == 2:
             try:
                 self.par_plot.lines.remove(self.PAR_LINE)
             except:
                 pass
 
             spot_info = self.spot_storage.get(self.PAR_SELECTED)
+            if self.MODE == 1:
+                linestyle = "r-"
+            elif self.MODE == 2:
+                linestyle = "g-"
             self.PAR_LINE, = self.par_plot.plot(
                 [spot_info.xpos, event.xdata],
                 [spot_info.ypos, event.ydata],
-                "r-", lw=2
+                linestyle,
+                lw=2
             )
             plt.draw()
 
     def key_press_event(self, event):
-        if self.MODE == 1:
+        if self.MODE == 1 or self.MODE == 2:
             if event.key == "escape":
                 self.MODE = 0
                 try:
