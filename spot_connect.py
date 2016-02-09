@@ -156,11 +156,9 @@ class Connector(object):
                     pass
                 spot_info = self.spot_storage.get(self.PAR_SELECTED)
                 spot_info.spot_marker.set_color(spot_info.colour)
-                spot_info.spot_line = self.par_plot.add_artist(spot_info.spot_line)
-                self.par_plot.lines.append(spot_info.spot_line)
+                spot_info.spot_line = self.par_plot.add_line(spot_info.spot_line)
 
                 plt.draw()
-
 
 
 def process(f, lineage_num):
