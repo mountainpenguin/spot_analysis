@@ -8,6 +8,7 @@ import numpy as np
 import re
 import seaborn as sns
 sns.set_style("white")
+import sys
 
 from analysis_lib import shared
 from lineage_lib import track
@@ -243,10 +244,11 @@ def decorate_daughters(cell_line, lineage, ax, pad=10):
         )
 
 
-def plot_graphs(cell_line, lineage_num):
+def plot_graphs(cell_line, lineage_num, num_plots=5):
     lineage = track.Lineage()
     fig = plt.figure(figsize=(20, 10))
     gs = matplotlib.gridspec.GridSpec(2, 3)
+
     fig.patch.set_alpha(0)
 
     spots_ParA = []
@@ -310,36 +312,40 @@ def plot_graphs(cell_line, lineage_num):
         i += 1
     parAs = np.array(sorted(parAs.items()))
 
-    parA_heatmap.plot(
-        parAs[:, 0], parAs[:, 1],
-        lw=2, marker=".", mec="k", ms=10
-    )
+    if num_plots >= 2:
+        parA_heatmap.plot(
+            parAs[:, 0], parAs[:, 1],
+            lw=2, marker=".", mec="k", ms=10
+        )
 
     decorate_daughters(cell_line, lineage, parA_heatmap)
     parA_heatmap.patch.set_alpha(0)
 
-    ax_parA = fig.add_subplot(gs[1, 0])
-    _despine(ax_parA)
-    ax_parA.set_title("ParA maximum")
-    ax_parA.plot(
-        parAs[:, 0], (L / 2) - parAs[:, 1],
-        marker=".", lw=2, mec="k", ms=10,
-        label="Distance from top pole"
-    )
-    ax_parA.plot(
-        parAs[:, 0], (L / 2) + parAs[:, 1],
-        marker=".", lw=2, mec="k", ms=10,
-        label="Distance from bottom pole"
-    )
-    ax_parA.set_xlabel(r"Time (min)")
-    ax_parA.set_ylabel(r"Distance (px)")
-    ax_parA.patch.set_alpha(0)
+    if num_plots >= 3:
+        ax_parA = fig.add_subplot(gs[1, 0])
+        _despine(ax_parA)
+        ax_parA.set_title("ParA maximum")
+        ax_parA.plot(
+            parAs[:, 0], (L / 2) - parAs[:, 1],
+            marker=".", lw=2, mec="k", ms=10,
+            label="Distance from top pole"
+        )
+        ax_parA.plot(
+            parAs[:, 0], (L / 2) + parAs[:, 1],
+            marker=".", lw=2, mec="k", ms=10,
+            label="Distance from bottom pole"
+        )
+        ax_parA.set_xlabel(r"Time (min)")
+        ax_parA.set_ylabel(r"Distance (px)")
+        ax_parA.patch.set_alpha(0)
 
-    parB_midcell = fig.add_subplot(gs[0, 1])
-    _despine(parB_midcell)
-    parB_midcell.set_title("ParB")
-    parB_midcell.plot(t, L / 2, "k-", lw=2, label="Cell poles")
-    parB_midcell.plot(t, -(L / 2), "k-", lw=2)
+    if num_plots >= 2:
+        parB_midcell = fig.add_subplot(gs[0, 1])
+        _despine(parB_midcell)
+        parB_midcell.set_title("ParB")
+        parB_midcell.plot(t, L / 2, "k-", lw=2, label="Cell poles")
+        parB_midcell.plot(t, -(L / 2), "k-", lw=2)
+
     spots_ParB = shared.get_parB_path(cell_line, T, lineage_num)
     spotnum = 1
     colourwheel = sns.color_palette(n_colors=len(spots_ParB))
@@ -358,12 +364,19 @@ def plot_graphs(cell_line, lineage_num):
             timings = s["timing"]
             positions = s["position"]
 
-        parB_midcell.plot(
+        if num_plots >= 2:
+            ax_target = parB_midcell
+            label = "Spot {0}".format(spotnum)
+        else:
+            ax_target = parA_heatmap
+            colour = colourwheel[1]
+            label = "ParB"
+
+        ax_target.plot(
             timings, positions,
             lw=2, marker=".", markeredgecolor="k", ms=10,
-            label="Spot {0}".format(spotnum),
+            label=label,
             color=colour
-#            color=colourwheel[0]
         )
 
         dparA = []
@@ -380,71 +393,87 @@ def plot_graphs(cell_line, lineage_num):
 
         spotnum += 1
 
-    parB_midcell.set_ylabel(r"Distance from mid-cell (px)")
-    parB_midcell.set_xlabel(r"Time (min)")
+    if num_plots >= 2:
+        lines = parB_midcell.lines[::-1]
+        for l in lines:
+            parB_midcell.lines.remove(l)
+            parB_midcell.add_line(l)
 
-    decorate_daughters(cell_line, lineage, parB_midcell, pad=5)
+        parB_midcell.set_ylabel(r"Distance from mid-cell (px)")
+        parB_midcell.set_xlabel(r"Time (min)")
 
-    parB_midcell.legend(bbox_to_anchor=(1.35, 1))
-    parB_midcell.patch.set_alpha(0)
+        decorate_daughters(cell_line, lineage, parB_midcell, pad=5)
 
-    filtered = [x for x in spots_ParB if len(x) > 4]
-    if len(filtered) > 0:
-        ax_parB_closest = fig.add_subplot(gs[1, 1], sharex=ax_parA, sharey=ax_parA)
-        dmin = min(
-            filtered,
-            key=lambda x: np.abs(x.parA_dmean)
-        )
-        ax_parB_closest.set_title("ParB spot {0} (dmin)".format(dmin.spotnum))
-        _despine(ax_parB_closest)
-        s = dmin.spots(False)
-        dpol_t = (dmin.len() / 2) - s["position"]
-        dpol_b = (dmin.len() / 2) + s["position"]
-
-        ax_parB_closest.plot(
-            s["timing"], dpol_t,
-            marker=".", lw=2, mec="k", ms=10,
-            label="Distance from top pole"
-        )
-        ax_parB_closest.plot(
-            s["timing"], dpol_b,
-            marker=".", lw=2, mec="k", ms=10,
-            label="Distance from bottom pole"
-        )
-        ax_parB_closest.plot(
-            s["timing"], dmin.parA_d,
-            marker=".", lw=2, ms=10,
-            label="Distance from ParA focus"
-        )
-        ax_parB_closest.plot(
-            ax_parB_closest.get_xlim(),
-            [0, 0],
-            "k--"
-        )
-        ax_parB_closest.patch.set_alpha(0)
-
-        imax = max(filtered, key=lambda x: x.intensity_mean)
-        if imax.id != dmin.id:
-            ax_parB_highest = fig.add_subplot(gs[1, 2], sharex=ax_parB_closest, sharey=ax_parA)
-            s = imax.spots(False)
-            dpol_t = (imax.len() / 2) - s["position"]
-            dpol_b = (imax.len() / 2) + s["position"]
-            ax_parB_highest.plot(s["timing"], dpol_t, marker=".", lw=2, mec="k", ms=10, label="Distance from top pole")
-            ax_parB_highest.plot(s["timing"], dpol_b, marker=".", lw=2, mec="k", ms=10, label="Distance from bottom pole")
-            ax_parB_highest.plot(s["timing"], imax.parA_d, marker=".", lw=2, mec="k", ms=10, label="Distance from ParA focus")
-
-            ax_parB_highest.plot(ax_parB_highest.get_xlim(), [0, 0], "k--")
-
-            _despine(ax_parB_highest)
-            ax_parB_highest.set_title("ParB Spot {0} (imax)".format(imax.spotnum))
-            ax_parB_highest.set_ylabel(r"Distance (px)")
-            ax_parB_highest.set_xlabel("Time (min)")
-            ax_parB_highest.patch.set_alpha(0)
-            ax_parB_highest.legend(bbox_to_anchor=(0.8, 1.35))
-        else:
-            ax_parB_closest.legend(bbox_to_anchor=(1.65, 1))
+        parB_midcell.legend(bbox_to_anchor=(1.35, 1))
+        parB_midcell.patch.set_alpha(0)
     else:
-        ax_parA.legend(bbox_to_anchor=(1.65, 1))
+        parA_heatmap.legend(
+            [parA_heatmap.lines[-1]], [parA_heatmap.lines[-1].get_label()],
+            bbox_to_anchor=(1.2, 1)
+        )
+
+    if num_plots >= 4:
+        filtered = [x for x in spots_ParB if len(x) > 4]
+        if len(filtered) > 0:
+            ax_parB_closest = fig.add_subplot(gs[1, 1], sharex=ax_parA, sharey=ax_parA)
+            dmin = min(
+                filtered,
+                key=lambda x: np.abs(x.parA_dmean)
+            )
+            ax_parB_closest.set_title("ParB spot {0} (dmin)".format(dmin.spotnum))
+            _despine(ax_parB_closest)
+            s = dmin.spots(False)
+            dpol_t = (dmin.len() / 2) - s["position"]
+            dpol_b = (dmin.len() / 2) + s["position"]
+
+            ax_parB_closest.plot(
+                s["timing"], dpol_t,
+                marker=".", lw=2, mec="k", ms=10,
+                label="Distance from top pole"
+            )
+            ax_parB_closest.plot(
+                s["timing"], dpol_b,
+                marker=".", lw=2, mec="k", ms=10,
+                label="Distance from bottom pole"
+            )
+            ax_parB_closest.plot(
+                s["timing"], dmin.parA_d,
+                marker=".", lw=2, ms=10,
+                label="Distance from ParA focus"
+            )
+            ax_parB_closest.plot(
+                ax_parB_closest.get_xlim(),
+                [0, 0],
+                "k--"
+            )
+            ax_parB_closest.patch.set_alpha(0)
+
+            if num_plots >= 5:
+                imax = max(filtered, key=lambda x: x.intensity_mean)
+                if imax.id != dmin.id:
+                    ax_parB_highest = fig.add_subplot(gs[1, 2], sharex=ax_parB_closest, sharey=ax_parA)
+                    s = imax.spots(False)
+                    dpol_t = (imax.len() / 2) - s["position"]
+                    dpol_b = (imax.len() / 2) + s["position"]
+                    ax_parB_highest.plot(s["timing"], dpol_t, marker=".", lw=2, mec="k", ms=10, label="Distance from top pole")
+                    ax_parB_highest.plot(s["timing"], dpol_b, marker=".", lw=2, mec="k", ms=10, label="Distance from bottom pole")
+                    ax_parB_highest.plot(s["timing"], imax.parA_d, marker=".", lw=2, mec="k", ms=10, label="Distance from ParA focus")
+
+                    ax_parB_highest.plot(ax_parB_highest.get_xlim(), [0, 0], "k--")
+
+                    _despine(ax_parB_highest)
+                    ax_parB_highest.set_title("ParB Spot {0} (imax)".format(imax.spotnum))
+                    ax_parB_highest.set_ylabel(r"Distance (px)")
+                    ax_parB_highest.set_xlabel("Time (min)")
+                    ax_parB_highest.patch.set_alpha(0)
+                    ax_parB_highest.legend(bbox_to_anchor=(0.8, 1.35))
+                else:
+                    ax_parB_closest.legend(bbox_to_anchor=(1.65, 1))
+            else:
+                ax_parB_closest.legend(bbox_to_anchor=(1.65, 1))
+        else:
+            ax_parA.legend(bbox_to_anchor=(1.65, 1))
+
 
     plt.tight_layout()
     fn = "data/data-lineage{0:02d}.pdf".format(lineage_num)
@@ -455,6 +484,12 @@ def plot_graphs(cell_line, lineage_num):
 
 
 if __name__ == "__main__":
+    num_plots = 5
+    for x in sys.argv:
+        if "-n" in x:
+            num_plots = int(x.split("-n")[1])
+            break
+
     targetfiles = sorted(glob.glob("data/cell_lines/lineage*.npy"))
     for targetfile in targetfiles:
         cell_line = np.load(targetfile)
