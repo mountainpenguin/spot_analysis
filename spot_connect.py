@@ -110,6 +110,7 @@ class Connector(object):
         self.lineage_num = lineage_num
         self.T = cell_line[0].T
         self.t = cell_line[0].t
+        self.L = np.array([x.length[0][0] for x in cell_line])
         self.spots = shared.get_parB_path(self.cell_line, self.T, self.lineage_num)
         self.spot_storage = SpotStorage()
 
@@ -166,6 +167,16 @@ class Connector(object):
         plt.draw()
 
     def plot_parB(self):
+        # plot cell lengths
+        self.par_plot.plot(
+            self.t, self.L / 2,
+            "k-", lw=2
+        )
+        self.par_plot.plot(
+            self.t, -(self.L / 2),
+            "k-", lw=2
+        )
+
         colourwheel = sns.color_palette(n_colors=len(self.spots))
         spotnum = 1
         defer_commands = []
@@ -409,6 +420,17 @@ class Connector(object):
 
     def redraw_par(self):
         self.par_plot.clear()
+
+        # plot cell lengths
+        self.par_plot.plot(
+            self.t, self.L / 2,
+            "k-", lw=2
+        )
+        self.par_plot.plot(
+            self.t, -(self.L / 2),
+            "k-", lw=2
+        )
+
         self.par_plot.patch.set_alpha(0)
         progenitors = list(self.spot_storage.get_progenitors())
         colourwheel = sns.color_palette("husl", len(progenitors))
