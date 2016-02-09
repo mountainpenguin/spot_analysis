@@ -456,6 +456,7 @@ class InteractivePlot(object):
             pb.img_x = img_x
             pb.img_y = img_y
             self.par_spots.append(pb)
+        self.trace_plot.patch.set_alpha(0)
         self.redraw()
 
     def draw_par_path(self):
@@ -490,6 +491,7 @@ class InteractivePlot(object):
             self.cell_line, self.lineage,
             self.par_plot, pad=5
         )
+        self.par_plot.patch.set_alpha(0)
         self.redraw()
 
     def update_par_time_indicator(self):
