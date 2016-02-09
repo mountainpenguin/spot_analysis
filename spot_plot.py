@@ -153,7 +153,7 @@ def decorate_daughters(cell_line, lineage, ax, pad=10):
         child2 = lineage.frames.cell(children_ids[1])
 
         ldiff = (child1.length[0][0] + child2.length[0][0] -
-                    parent_cell.length[0][0])
+                 parent_cell.length[0][0])
 
         # determine which pole each child corresponds to
         # for cell1/cell2 assignment
@@ -275,8 +275,8 @@ def plot_graphs(cell_line, lineage_num):
         trace = cell.parA_fluorescence_smoothed
         l = cell.length[0][0]
         x0 = t[i] - 8
-        y0 = -(cell.length[0][0] / 2)
-        increment = cell.length[0][0] / len(trace)
+        y0 = -(l / 2)
+        increment = l / len(trace)
         colours = cmapper(trace / max_parA_intensity)
         i2 = 0
         for _t in trace:
@@ -286,7 +286,6 @@ def plot_graphs(cell_line, lineage_num):
                 (x0, y0),
                 width=15,
                 height=increment,
-#                facecolor=str(_t / max_parA_intensity),
                 facecolor=colours[i2],
                 edgecolor="none",
             )
@@ -298,7 +297,6 @@ def plot_graphs(cell_line, lineage_num):
     ax.set_ylabel(r"Distance from mid-cell (px)")
     ax.set_xlabel(r"Time (min)")
     ax.set_title("ParA")
-
 
     ax.plot(t, L / 2, "k-", lw=2)
     ax.plot(t, -(L / 2), "k-", lw=2)
