@@ -322,7 +322,6 @@ class Connector(object):
             # curr_spot old_child changes:
             # add split_parent: curr_spot
             # parent to None
-            print("{0} gets split_parent {1}".format(old_child.ID, curr_spot.ID))
             self.spot_storage.split_parent(
                 old_child.ID,
                 curr_spot.ID
@@ -358,7 +357,6 @@ class Connector(object):
             # new_child
             # add split_parent: curr_spot
             # parent to None
-            print("{0} gets split_parent {1}".format(new_child.ID, curr_spot.ID))
             self.spot_storage.split_parent(
                 new_child.ID,
                 curr_spot.ID
@@ -402,6 +400,7 @@ class Connector(object):
                 spot_info.spot_line = self.par_plot.add_line(spot_info.spot_line)
 
             self.mode_default()
+            return
         elif self.MODE == 1 and event.key == "enter":
             # disconnect child
             # remove PAR_LINE
@@ -413,9 +412,12 @@ class Connector(object):
             spot_info.spot_marker.set_color(spot_info.colour)
             spot_info.spot_line = None
             self.mode_default()
+            return
         elif self.MODE == 0 and event.key == "enter":
             # save results
             self.update_parB()
+            plt.close()
+        elif self.MODE == 0 and event.key == "escape":
             plt.close()
 
     def redraw_par(self):

@@ -184,7 +184,10 @@ def decorate_daughters(cell_line, lineage, ax, pad=10):
             child2 = lineage.frames.cell(children_ids[0])
 
         # width should be approx. an 18th of the total xrange
-        width = (cell_line[0].t[-1] - cell_line[0].t[0]) / 18
+        if len(cell_line[0].t) == 1:
+            width = 1
+        else:
+            width = (cell_line[0].t[-1] - cell_line[0].t[0]) / 18
 
         shared_params = {
             "width": width,
