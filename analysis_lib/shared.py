@@ -6,6 +6,46 @@ import datetime
 import hashlib
 import random
 import string
+import os
+
+
+class TraceConnect(object):
+    def __init__(self, t, pos, intensity, length, ID):
+        self.id = hashlib.sha1("".join([
+            random.choice(
+                string.ascii_letters + string.digits
+            ) for x in range(40)
+        ]).encode("utf8")).hexdigest()
+        self.spot_ids = [ID]
+        self.timing = [t]
+        if pos < 0:
+            self.POLE = -1
+        else:
+            self.POLE = 1
+        self.position = [pos]
+        self.intensity = [intensity]
+        self.length = [length]
+
+    def spots(self, adjust=False):
+        return np.array([
+            self.timing,
+            self.position,
+            self.intensity
+        ]).T
+
+    def len(self):
+        return np.array(self.length)
+
+    def append(self, t, pos, intensity, length, ID):
+        self.timing.append(t)
+        self.position.append(pos)
+        self.intensity.append(intensity)
+        self.length.append(length)
+        self.spot_ids.append(ID)
+
+    def __len__(self):
+        return len(self.length)
+
 
 
 class SpotTimeLapse(object):
@@ -88,7 +128,15 @@ def get_parA_path(cell_line, T):
     return [spots_ParA]
 
 
-def get_parB_path(cell_line, T):
+def get_parB_path(cell_line, T, lineage_num, force=False):
+    if not force:
+        # check for pre-existing file
+        lineage_num = int(lineage_num)
+        target = "data/spot_data/lineage{0:02d}.npy".format(lineage_num)
+        if os.path.exists(target):
+            spots_ParB = np.load(target)
+            return spots_ParB
+
     start = cell_line[0].frame - 1
     end = cell_line[-1].frame - 1
     t = np.array(T[start:end + 1])

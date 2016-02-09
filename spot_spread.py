@@ -16,7 +16,7 @@ def gen_xl(cell_line, lineage_num):
     t = cell_line[0].t
 
     spots_ParA = [x.ParA for x in cell_line]
-    spots_ParB = shared.get_parB_path(cell_line, T)
+    spots_ParB = shared.get_parB_path(cell_line, T, lineage_num)
 
     excel_wb = xlwt.Workbook()
     ws_parA = excel_wb.add_sheet("ParA")

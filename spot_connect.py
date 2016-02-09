@@ -17,7 +17,7 @@ from analysis_lib import shared
 
 
 class SpotPicker(object):
-    def __init__(self, ID, spot_marker, spot_line, xpos, ypos, colour, spot_parent, spot_child):
+    def __init__(self, ID, spot_marker, spot_line, xpos, ypos, colour, spot_parent, spot_child, intensity, cell_length):
         self.ID = ID
         self.spot_marker = spot_marker
         self.spot_line = spot_line
@@ -26,13 +26,15 @@ class SpotPicker(object):
         self.colour = colour
         self.spot_parent = spot_parent
         self.spot_child = spot_child
+        self.intensity = intensity
+        self.cell_length = cell_length
 
 
 class SpotStorage(object):
     def __init__(self):
         self.spots = {}
 
-    def add(self, spot_marker, spot_line, xpos, ypos, colour, spot_parent, spot_child, ID=None):
+    def add(self, spot_marker, spot_line, xpos, ypos, colour, spot_parent, spot_child, intensity, cell_length, ID=None):
         if not ID:
             ID = "".join([random.choice(string.ascii_letters) for x in range(20)])
 
@@ -43,7 +45,7 @@ class SpotStorage(object):
 
         self.spots[ID] = SpotPicker(
             ID, spot_marker, spot_line, xpos, ypos, colour,
-            spot_parent, spot_child
+            spot_parent, spot_child, intensity, cell_length
         )
         return ID
 
@@ -89,7 +91,7 @@ class Connector(object):
         self.lineage_num = lineage_num
         self.T = cell_line[0].T
         self.t = cell_line[0].t
-        self.spots = shared.get_parB_path(self.cell_line, self.T)
+        self.spots = shared.get_parB_path(self.cell_line, self.T, self.lineage_num)
         self.spot_storage = SpotStorage()
 
         self.plot_setup()
@@ -186,6 +188,8 @@ class Connector(object):
                     colour,
                     spot_parent,
                     spot_child,
+                    spot[2],
+                    x.len()[index],
                 )
                 spot_marker.marker_id = spot_marker_id
                 spot_ids.append(spot_marker_id)
@@ -222,7 +226,10 @@ class Connector(object):
 
             if new_child.spot_parent:
                 old_parent = new_child.spot_parent
-                self.par_plot.lines.remove(old_parent.spot_line)
+                try:
+                    self.par_plot.lines.remove(old_parent.spot_line)
+                except:
+                    pass
                 old_parent.spot_line = None
                 old_parent_child = old_parent.spot_child
                 self.spot_storage.set_parent(old_parent_child.ID, None)
@@ -295,6 +302,7 @@ class Connector(object):
             self.mode_default()
         elif self.MODE == 0 and event.key == "enter":
             # save results
+            self.update_parB()
             plt.close()
 
     def redraw_par(self):
@@ -351,6 +359,32 @@ class Connector(object):
         for p, c in updates.items():
             self.spot_storage.set_child(p, c)
 
+    def update_parB(self):
+        spots = []
+        for progenitor in self.spot_storage.get_progenitors():
+            tl = shared.TraceConnect(
+                t=progenitor.xpos,
+                pos=progenitor.ypos,
+                intensity=progenitor.intensity,
+                length=progenitor.cell_length,
+                ID=progenitor.ID,
+            )
+            while progenitor.spot_child:
+                progenitor = progenitor.spot_child
+                tl.append(
+                    t=progenitor.xpos,
+                    pos=progenitor.ypos,
+                    intensity=progenitor.intensity,
+                    length=progenitor.cell_length,
+                    ID=progenitor.ID,
+                )
+            spots.append(tl)
+
+        os.makedirs("data/spot_data", exist_ok=True)
+        np.save(
+            "data/spot_data/lineage{0:02d}.npy".format(self.lineage_num),
+            spots
+        )
 
 def process(f, lineage_num):
     cell_line = np.load(f)

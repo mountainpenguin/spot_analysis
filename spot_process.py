@@ -181,7 +181,7 @@ class InteractivePlot(object):
             x.set_alpha(0.8)
 
         # store current Par spots as backup
-        self.Par_backup = list(self.get_par())
+        self.backup()
         self.redraw()
 
     def mode_remove(self):
@@ -194,8 +194,7 @@ class InteractivePlot(object):
         for x in self.par_spots:
             x.set_color("b")
 
-        # backup current Par spots
-        self.Par_backup = list(self.get_par())
+        self.backup()
         self.redraw()
 
     def mode_replace(self):
@@ -206,7 +205,7 @@ class InteractivePlot(object):
         for x in self.par_spots:
             x.set_color("b")
 
-        self.Par_backup = list(self.get_par())
+        self.backup()
         self.redraw()
 
     def draw_cell(self):
@@ -277,7 +276,7 @@ class InteractivePlot(object):
             self.par_img_spots.append(pb)
 
             # recalculate par lines
-            self.determine_par_path()
+            self.determine_par_path(force=True)
             self.draw_par_path()
 
             self.redraw()
@@ -298,7 +297,7 @@ class InteractivePlot(object):
             self.current_cell.ParB.append(
                 (xpos, intensity, self.current_cell.length[0][0])
             )
-            self.determine_par_path()
+            self.determine_par_path(force=True)
             self.draw_par_path()
             pb, = self.trace_plot.plot(xpos, intensity, "r.", ms=10)
             pb.set_picker(5)
@@ -339,6 +338,8 @@ class InteractivePlot(object):
             if event.key == "enter":
                 self.next()
             elif event.key == "escape":
+                if self.TARGET == "B":
+                    self.restore_file()
                 self.end(discard=True)
             elif event.key == "a":
                 self.mode_add()
@@ -553,6 +554,22 @@ class InteractivePlot(object):
 
         plt.close(self.fig)
 
+    def backup(self):
+        self.Par_backup = list(self.get_par())
+        if os.path.exists("data/spot_data/lineage{0:02d}.npy".format(self.lineage_num)):
+            src = "data/spot_data/lineage{0:02d}.npy".format(self.lineage_num)
+            target = os.path.join("data/spot_data/backups")
+            os.makedirs(target, exist_ok=True)
+            target = os.path.join(
+                target, "{0}-lineage{1:02d}.npy".format(
+                    datetime.datetime.strftime(datetime.datetime.now(), "%Y%m%d-%H%M"),
+                    self.lineage_num
+                )
+            )
+            self.spot_file_backup = target
+            os.rename(src, target)
+
+
 
 class InteractivePlotA(InteractivePlot):
     TARGET = "A"
@@ -562,7 +579,7 @@ class InteractivePlotA(InteractivePlot):
         ("t", "Replace Mode", "t"),
     ]
 
-    def determine_par_path(self):
+    def determine_par_path(self, force=False):
         # get ParA path
         self.spots = shared.get_parA_path(self.cell_line, self.T)
 
@@ -591,8 +608,8 @@ class InteractivePlotB(InteractivePlot):
         ("r", "Remove Mode", "r"),
     ]
 
-    def determine_par_path(self):
-        self.spots = shared.get_parB_path(self.cell_line, self.T)
+    def determine_par_path(self, force=False):
+        self.spots = shared.get_parB_path(self.cell_line, self.T, self.lineage_num, force=force)
 
     def get_img(self):
         return self.current_cell.parB_img
@@ -608,6 +625,14 @@ class InteractivePlotB(InteractivePlot):
 
     def discard(self):
         self.current_cell.ParB = list(self.Par_backup)
+        self.restore_file()
+
+    def restore_file(self):
+        if hasattr(self, "spot_file_backup"):
+            os.rename(
+                self.spot_file_backup,
+                "data/spot_data/lineage{0:02d}.npy".format(self.lineage_num)
+            )
 
 
 def process(f, noplot=False, lineage_num=None, target="ParB"):

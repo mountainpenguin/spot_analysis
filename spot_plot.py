@@ -340,7 +340,7 @@ def plot_graphs(cell_line, lineage_num):
     ax.set_title("ParB")
     ax.plot(t, L / 2, "k-", lw=2, label="Cell poles")
     ax.plot(t, -(L / 2), "k-", lw=2)
-    spots_ParB = shared.get_parB_path(cell_line, T)
+    spots_ParB = shared.get_parB_path(cell_line, T, lineage_num)
     spotnum = 1
     for x in spots_ParB:
         s = x.spots(False)
