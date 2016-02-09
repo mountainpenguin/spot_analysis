@@ -7,13 +7,13 @@ import glob
 import re
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.colors
 import random
 import string
 import seaborn as sns
 sns.set_style("white")
 
 from analysis_lib import shared
+
 
 class SpotPicker(object):
     def __init__(self, ID, spot_marker, spot_line, xpos, ypos, colour):
@@ -23,6 +23,7 @@ class SpotPicker(object):
         self.xpos = xpos
         self.ypos = ypos
         self.colour = colour
+
 
 class SpotStorage(object):
     def __init__(self):
@@ -132,8 +133,6 @@ class Connector(object):
 
     def motion_notify_event(self, event):
         if self.MODE == 1:
-            xpos = event.xdata
-            ypos = event.ydata
             try:
                 self.par_plot.lines.remove(self.PAR_LINE)
             except:
