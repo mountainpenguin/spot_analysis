@@ -17,7 +17,7 @@ from analysis_lib import shared
 
 
 class SpotPicker(object):
-    def __init__(self, ID, spot_marker, spot_line, xpos, ypos, colour, spot_parent, spot_child, intensity, cell_length):
+    def __init__(self, ID, spot_marker, spot_line, xpos, ypos, colour, spot_parent, spot_child, intensity, cell_length, split_parent=None, split_children=None):
         self.ID = ID
         self.spot_marker = spot_marker
         self.spot_line = spot_line
@@ -28,13 +28,15 @@ class SpotPicker(object):
         self.spot_child = spot_child
         self.intensity = intensity
         self.cell_length = cell_length
+        self.split_parent = split_parent
+        self.split_children = split_children
 
 
 class SpotStorage(object):
     def __init__(self):
         self.spots = {}
 
-    def add(self, spot_marker, spot_line, xpos, ypos, colour, spot_parent, spot_child, intensity, cell_length, ID=None):
+    def add(self, spot_marker, spot_line, xpos, ypos, colour, spot_parent, spot_child, intensity, cell_length, ID=None, split_parent=None, split_children=None):
         if not ID:
             ID = "".join([random.choice(string.ascii_letters) for x in range(20)])
 
@@ -45,7 +47,8 @@ class SpotStorage(object):
 
         self.spots[ID] = SpotPicker(
             ID, spot_marker, spot_line, xpos, ypos, colour,
-            spot_parent, spot_child, intensity, cell_length
+            spot_parent, spot_child, intensity, cell_length,
+            split_parent, split_children,
         )
         return ID
 
@@ -83,6 +86,22 @@ class SpotStorage(object):
         else:
             spot_parent = None
         self.spots[ID].spot_parent = spot_parent
+
+    def split_parent(self, ID, split_parent_id):
+        if split_parent_id:
+            split_parent = self.get(split_parent_id)
+        else:
+            split_parent = None
+        self.spots[ID].split_parent = split_parent
+
+    def split_children(self, ID, split_child1, split_child2=None):
+        if not split_child1:
+            self.spots[ID].split_children = None
+        else:
+            self.spots[ID].split_children = [
+                self.get(split_child1),
+                self.get(split_child2)
+            ]
 
 
 class Connector(object):
@@ -147,8 +166,9 @@ class Connector(object):
         plt.draw()
 
     def plot_parB(self):
-        colourwheel = sns.color_palette("husl", len(self.spots))
+        colourwheel = sns.color_palette(n_colors=len(self.spots))
         spotnum = 1
+        defer_commands = []
         for x in self.spots:
             colour = colourwheel[spotnum - 1]
             s = x.spots(False)
@@ -179,7 +199,10 @@ class Connector(object):
                     spot_parent = spot_ids[index - 1]
 
                 spot_child = None
-                length = x.len()[index]
+                if len(spot) == 4:
+                    spot_marker_id = spot[3].decode("utf-8")
+                else:
+                    spot_marker_id = None
                 spot_marker_id = self.spot_storage.add(
                     spot_marker,
                     spot_line,
@@ -190,6 +213,7 @@ class Connector(object):
                     spot_child,
                     spot[2],
                     x.len()[index],
+                    ID=spot_marker_id,
                 )
                 spot_marker.marker_id = spot_marker_id
                 spot_ids.append(spot_marker_id)
@@ -199,7 +223,31 @@ class Connector(object):
                     self.spot_storage.set_child(spot_parent, spot_marker_id)
 
                 index += 1
+
+            # deal with splits
+            if hasattr(x, "split_parent") and x.split_parent:
+                split_parent = self.spot_storage.get(x.split_parent)
+                # first spot in lineage
+                first_spot = self.spot_storage.get(spot_ids[0])
+                self.spot_storage.split_parent(first_spot.ID, x.split_parent)
+
+                self.par_plot.plot(
+                    [split_parent.xpos, first_spot.xpos],
+                    [split_parent.ypos, first_spot.ypos],
+                    color=first_spot.colour
+                )
+
+            if hasattr(x, "split_children") and x.split_children:
+                last_child = spot_ids[-1]
+                defer_commands.append((
+                    self.spot_storage.split_children,
+                    (last_child, x.split_children[0], x.split_children[1])
+                ))
+
             spotnum += 1
+
+        for cmd, args in defer_commands:
+            cmd(*args)
         self.par_plot.patch.set_alpha(0)
 
     def pick_event(self, event):
@@ -249,13 +297,67 @@ class Connector(object):
 
             self.mode_default()
 
-
         elif self.MODE == 2:
             curr_spot = self.spot_storage.get(self.PAR_SELECTED)
+            if not curr_spot.spot_child:
+                return
+
             new_child = self.spot_storage.get(event.artist.marker_id)
             if new_child.xpos <= curr_spot.xpos:
                 return
-            print("split to new spot")
+
+            old_child = curr_spot.spot_child
+
+            # curr_spot old_child changes:
+            # add split_parent: curr_spot
+            # parent to None
+            print("{0} gets split_parent {1}".format(old_child.ID, curr_spot.ID))
+            self.spot_storage.split_parent(
+                old_child.ID,
+                curr_spot.ID
+            )
+            self.spot_storage.set_parent(
+                old_child.ID,
+                None
+            )
+
+            # curr_spot changes:
+            # add split_children to curr_spot
+            #   (current spot_child and new_child)
+            # spot_child to None
+            self.spot_storage.split_children(
+                curr_spot.ID,
+                old_child.ID,
+                new_child.ID
+            )
+            self.spot_storage.set_child(
+                curr_spot.ID,
+                None
+            )
+
+            # new_child parent
+            # spot_child to None
+            new_child_parent = new_child.spot_parent
+            if new_child_parent:
+                self.spot_storage.set_child(
+                    new_child_parent.ID,
+                    None
+                )
+
+            # new_child
+            # add split_parent: curr_spot
+            # parent to None
+            print("{0} gets split_parent {1}".format(new_child.ID, curr_spot.ID))
+            self.spot_storage.split_parent(
+                new_child.ID,
+                curr_spot.ID
+            )
+            self.spot_storage.set_parent(
+                new_child.ID,
+                None
+            )
+
+            self.mode_default()
 
     def motion_notify_event(self, event):
         if self.MODE == 1 or self.MODE == 2:
@@ -312,7 +414,9 @@ class Connector(object):
         colourwheel = sns.color_palette("husl", len(progenitors))
         spotnum = 1
         additions = []
-        updates = {}
+        child_updates = {}
+        split_parent_updates = {}
+        split_child_updates = {}
 
         for spot in progenitors:
             colour = colourwheel[spotnum - 1]
@@ -334,11 +438,11 @@ class Connector(object):
                         color=colour
                     )
                 if s.spot_parent:
-                    updates[s.spot_parent.ID] = s.ID
+                    child_updates[s.spot_parent.ID] = s.ID
 
                 spot_p = s.spot_parent and s.spot_parent.ID or None
 
-                additions.append({
+                data = {
                     "spot_marker": spot_marker,
                     "spot_line": spot_line,
                     "xpos": s.xpos,
@@ -349,15 +453,38 @@ class Connector(object):
                     "intensity": s.intensity,
                     "cell_length": s.cell_length,
                     "ID": s.ID
-                })
+                }
+                additions.append(data)
+
+                if hasattr(s, "split_parent") and s.split_parent:
+                    split_parent_updates[s.ID] = s.split_parent.ID
+
+                if hasattr(s, "split_children") and s.split_children:
+                    c1, c2 = s.split_children
+                    split_child_updates[s.ID] = (c1.ID, c2.ID)
+
                 index += 1
             spotnum += 1
 
         for add_ in additions:
             self.spot_storage.add(**add_)
 
-        for p, c in updates.items():
+        for p, c in child_updates.items():
             self.spot_storage.set_child(p, c)
+
+        for p1, p2 in split_parent_updates.items():
+            self.spot_storage.split_parent(p1, p2)
+            # draw line
+            parent1 = self.spot_storage.get(p1)
+            parent2 = self.spot_storage.get(p2)
+            self.par_plot.plot(
+                [parent2.xpos, parent1.xpos],
+                [parent2.ypos, parent1.ypos],
+                color=parent1.colour
+            )
+
+        for p, (c1, c2) in split_child_updates.items():
+            self.spot_storage.split_children(p, c1, c2)
 
     def update_parB(self):
         spots = []
@@ -369,6 +496,8 @@ class Connector(object):
                 length=progenitor.cell_length,
                 ID=progenitor.ID,
             )
+            if progenitor.split_parent:
+                tl.add_split_parent(progenitor.split_parent.ID)
             while progenitor.spot_child:
                 progenitor = progenitor.spot_child
                 tl.append(
@@ -378,6 +507,9 @@ class Connector(object):
                     length=progenitor.cell_length,
                     ID=progenitor.ID,
                 )
+            if progenitor.split_children:
+                child1, child2 = progenitor.split_children
+                tl.add_split_children(child1.ID, child2.ID)
             spots.append(tl)
 
         os.makedirs("data/spot_data", exist_ok=True)
@@ -385,6 +517,7 @@ class Connector(object):
             "data/spot_data/lineage{0:02d}.npy".format(self.lineage_num),
             spots
         )
+
 
 def process(f, lineage_num):
     cell_line = np.load(f)

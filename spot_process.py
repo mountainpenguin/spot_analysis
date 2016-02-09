@@ -468,7 +468,7 @@ class InteractivePlot(object):
         for x in self.spots:
             s = x.spots(False)
             self.par_plot.plot(
-                s[:, 0], s[:, 1],
+                s["timing"], s["position"],
                 lw=2, marker=".", mec="k",
                 ms=10, label="Spot {0}".format(spotnum)
             )
@@ -568,7 +568,6 @@ class InteractivePlot(object):
             )
             self.spot_file_backup = target
             os.rename(src, target)
-
 
 
 class InteractivePlotA(InteractivePlot):

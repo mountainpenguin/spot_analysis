@@ -25,13 +25,24 @@ class TraceConnect(object):
         self.position = [pos]
         self.intensity = [intensity]
         self.length = [length]
+        self.split_parent = None
+        self.split_children = None
 
     def spots(self, adjust=False):
-        return np.array([
-            self.timing,
-            self.position,
-            self.intensity
-        ]).T
+        data = []
+        for x in range(len(self.timing)):
+            data.append((
+                self.timing[x],
+                self.position[x],
+                self.intensity[x],
+                self.spot_ids[x].encode("ascii")
+            ))
+        return np.array(data, dtype=[
+            ("timing", "i4"),
+            ("position", "f4"),
+            ("intensity", "f4"),
+            ("id", "S20")
+        ])
 
     def len(self):
         return np.array(self.length)
@@ -46,6 +57,11 @@ class TraceConnect(object):
     def __len__(self):
         return len(self.length)
 
+    def add_split_parent(self, ID):
+        self.split_parent = ID
+
+    def add_split_children(self, child1, child2):
+        self.split_children = [child1, child2]
 
 
 class SpotTimeLapse(object):
@@ -66,18 +82,18 @@ class SpotTimeLapse(object):
         self.lengths = [l]
 
     def spots(self, adjust=True):
-        if adjust:
-            return np.array([
-                self.timing,
-                self.POLE * np.array(self.positions),
-                self.intensity
-            ]).T
-        else:
-            return np.array([
-                self.timing,
-                self.positions,
-                self.intensity
-            ]).T
+        data = []
+        for x in range(len(self.timing)):
+            data.append((
+                self.timing[x],
+                adjust and self.POLE * self.positions[x] or self.positions[x],
+                self.intensity[x]
+            ))
+        return np.array(data, dtype=[
+            ("timing", "i4"),
+            ("position", "f4"),
+            ("intensity", "f4")
+        ])
 
     def len(self):
         return np.array(self.lengths)
@@ -135,7 +151,7 @@ def get_parB_path(cell_line, T, lineage_num, force=False):
         target = "data/spot_data/lineage{0:02d}.npy".format(lineage_num)
         if os.path.exists(target):
             spots_ParB = np.load(target)
-            return spots_ParB
+            return sorted(spots_ParB, key=lambda x: x.timing[0])
 
     start = cell_line[0].frame - 1
     end = cell_line[-1].frame - 1
@@ -209,7 +225,7 @@ def get_parB_path(cell_line, T, lineage_num, force=False):
 
         i += 1
 
-    return spots_ParB
+    return sorted(spots_ParB, key=lambda x: x.timing[0])
 
 
 def get_timings(t0=False):

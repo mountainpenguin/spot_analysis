@@ -79,8 +79,8 @@ def gen_xl(cell_line, lineage_num):
             ws_parB.write(r, col + 2, float(dpA))
 
         # intensity mean and SEM for spot lineage
-        intensity_mean = s[:, 2].mean()
-        intensity_sem = s[:, 2].std() / np.sqrt(len(s[:, 1]))
+        intensity_mean = s["intensity"].mean()
+        intensity_sem = s["intensity"].std() / np.sqrt(len(s["intensity"]))
         ws_parB.write(rmax + 2, col + 1, float(intensity_mean))
         ws_parB.write(rmax + 3, col + 1, float(intensity_sem))
 
