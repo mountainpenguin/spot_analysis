@@ -128,8 +128,9 @@ def plot_images(cell_line, lineage_num):
             plt.plot(parB[0], parB[1], "r.", ms=30)
 
         _despine(ax)
-        plt.xlabel("Position")
-        plt.ylabel("Intensity")
+        ax.set_xlabel("Position")
+        ax.set_ylabel("Intensity")
+        ax.patch.set_alpha(0)
 
         sp_num += 1
 
@@ -317,6 +318,7 @@ def plot_graphs(cell_line, lineage_num):
     )
 
     decorate_daughters(cell_line, lineage, ax)
+    ax.patch.set_alpha(0)
 
     ax_parA = fig.add_subplot(gs[1, 0])
     _despine(ax_parA)
@@ -333,6 +335,7 @@ def plot_graphs(cell_line, lineage_num):
     )
     ax_parA.set_xlabel(r"Time (min)")
     ax_parA.set_ylabel(r"Distance (px)")
+    ax_parA.patch.set_alpha(0)
 
     ax = fig.add_subplot(gs[0, 1])
     _despine(ax)
@@ -369,6 +372,7 @@ def plot_graphs(cell_line, lineage_num):
     decorate_daughters(cell_line, lineage, ax, pad=5)
 
     ax.legend(bbox_to_anchor=(1.35, 1))
+    ax.patch.set_alpha(0)
 
     filtered = [x for x in spots_ParB if len(x) > 4]
     if len(filtered) > 0:
@@ -403,6 +407,7 @@ def plot_graphs(cell_line, lineage_num):
             [0, 0],
             "k--"
         )
+        ax_parB_closest.patch.set_alpha(0)
 
         imax = max(filtered, key=lambda x: x.intensity_mean)
         if imax.id != dmin.id:
@@ -420,6 +425,7 @@ def plot_graphs(cell_line, lineage_num):
             ax.set_title("ParB Spot {0} (imax)".format(imax.spotnum))
             ax.set_ylabel(r"Distance (px)")
             ax.set_xlabel("Time (min)")
+            ax.patch.set_alpha(0)
             ax.legend(bbox_to_anchor=(0.8, 1.35))
         else:
             ax_parB_closest.legend(bbox_to_anchor=(1.65, 1))
