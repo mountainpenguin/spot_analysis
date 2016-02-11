@@ -381,7 +381,7 @@ class Analysis(track.Lineage):
         self.T = shared.get_timings()
         cell_line_num = 1
         for cell_line in cell_lines:
-            if self.SKIP and os.path.exists("data/data-lineage{0}.pdf".format(cell_line_num)):
+            if self.SKIP and os.path.exists("data/cell_lines/lineage{0:02d}.npy".format(cell_line_num)):
                 print("Skipping cell lineage {0} of {1}".format(
                     cell_line_num, len(cell_lines)
                 ))
