@@ -93,12 +93,15 @@ def plot_images(cell_line, lineage_num):
 
         # plot ParA in RGB red with white mesh
         ax = fig.add_subplot(gs[1, sp_num:sp_num + 1])
+        red_chan = cell.parA_img_bg / np.nanmax(cell.parA_img_bg[ymin:ymax, xmin:xmax])
+        red_chan[red_chan > 1] = 1
         parA_img = np.dstack((
-            cell.parA_img_bg / np.nanmax(cell.parA_img_bg),
+            red_chan,
             np.zeros(cell.parA_img.shape),
             np.zeros(cell.parA_img.shape)
         ))
         ax.imshow(parA_img)
+
         # plot ParA focus as white spot
         x, y = cell.M_x[cell.ParA[0]], cell.M_y[cell.ParA[0]]
         plt.plot(x, y, "wo", ms=10)
@@ -106,9 +109,11 @@ def plot_images(cell_line, lineage_num):
 
         # plot ParB in RGB green with white mesh
         ax = fig.add_subplot(gs[2, sp_num:sp_num + 1])
+        green_chan = cell.parB_img_bg / np.nanmax(cell.parB_img_bg[ymin:ymax, xmin:xmax])
+        green_chan[green_chan > 1] = 1
         parB_img = np.dstack((
             np.zeros(cell.parB_img.shape),
-            cell.parB_img_bg / np.nanmax(cell.parB_img_bg),
+            green_chan,
             np.zeros(cell.parB_img.shape)
         ))
         ax.imshow(parB_img)
