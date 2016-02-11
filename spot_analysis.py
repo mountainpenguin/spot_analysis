@@ -41,6 +41,18 @@ def despine(ax=None, keep=0):
         ax.yaxis.set_ticks_position("none")
 
 
+class FakeImages(object):
+    def __init__(self, dimensions):
+        self.x, self.y = dimensions
+        self.dimensions = dimensions
+
+    def __getitem__(self, _):
+        if not os.path.exists("empty.tif"):
+            empty = np.zeros(self.dimensions)
+            scipy.misc.imsave("empty.tif", empty)
+        return "empty.tif"
+
+
 class Analysis(track.Lineage):
     MEAN = 1
     SUM = 2
@@ -355,8 +367,17 @@ class Analysis(track.Lineage):
 
     def spot_finder(self, phase, fluor, fluor2, cell_lines):
         self.phase = phase
-        self.fluor = fluor
-        self.fluor2 = fluor2
+
+        dimensions = scipy.misc.imread(self.phase[0]).shape
+        if not fluor:  # ParB
+            self.fluor = FakeImages(dimensions)
+        else:
+            self.fluor = fluor
+        if not fluor2:  # ParA
+            self.fluor2 = FakeImages(dimensions)
+        else:
+            self.fluor2 = fluor2
+
         self.T = shared.get_timings()
         cell_line_num = 1
         for cell_line in cell_lines:
@@ -486,8 +507,21 @@ def main(debug, skip, noimage):
         cell_lines.append(lin)
 
     phase = sorted(glob.glob("B/*.tif"))
-    parA = sorted(glob.glob("F1/*.tif"))
-    parB = sorted(glob.glob("F2/*.tif"))
+    if os.path.exists("F1") and os.path.exists("F2"):
+        parA = sorted(glob.glob("F1/*.tif"))
+        parB = sorted(glob.glob("F2/*.tif"))
+    else:
+        parA_path = input("parA path: ")
+        if not os.path.exists(parA_path):
+            parA = None
+        else:
+            parA = sorted(glob.glob("{0}/*.tif".format(parA_path)))
+
+        parB_path = input("parB path: ")
+        if not os.path.exists(parB_path):
+            parB = None
+        else:
+            parB = sorted(glob.glob("{0}/*.tif".format(parB_path)))
 
     A.spot_finder(phase, parB, parA, cell_lines)
 
