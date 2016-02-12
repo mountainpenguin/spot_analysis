@@ -209,12 +209,6 @@ class InteractivePlot(object):
         self.redraw()
 
     def draw_cell(self):
-        img = self.get_img()
-        img[np.isnan(img)] = 0
-        self.img_plot.imshow(img, cmap=plt.cm.viridis)
-        self.img_plot.plot(self.current_cell.mesh[:, 0], self.current_cell.mesh[:, 1], "k-")
-        self.img_plot.plot(self.current_cell.mesh[:, 2], self.current_cell.mesh[:, 3], "k-")
-
         # centre = self.current_cell.centre
         centre = track.Lineage.get_mesh_centre(None, self.current_cell)
         rang = 40
@@ -222,6 +216,15 @@ class InteractivePlot(object):
         xmax = centre[0] + rang
         ymin = centre[1] - rang
         ymax = centre[1] + rang
+
+        img = self.get_img()
+        img[np.isnan(img)] = 0
+        roi = img[ymin:ymax, xmin:xmax]
+        img[img > np.nanmax(roi)] = np.nanmax(roi)
+        self.img_plot.imshow(img, cmap=plt.cm.viridis)
+        self.img_plot.plot(self.current_cell.mesh[:, 0], self.current_cell.mesh[:, 1], "k-")
+        self.img_plot.plot(self.current_cell.mesh[:, 2], self.current_cell.mesh[:, 3], "k-")
+
         self.img_plot.set_xlim([xmin, xmax])
         self.img_plot.set_ylim([ymin, ymax])
 
