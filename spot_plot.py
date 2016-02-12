@@ -64,13 +64,27 @@ def plot_images(cell_line, lineage_num):
         ymin = cell.centre[1] - 40
         ymax = cell.centre[1] + 40
 
+        if xmin < 0:
+            xmin = 0
+            xmax = 80
+        elif xmax >= cell.phase_img.shape[0]:
+            xmin = cell.phase_img.shape[0] - 81
+            xmax = cell.phase_img.shape[0] - 1
+
+        if ymin < 0:
+            ymin = 0
+            ymax = 80
+        elif ymax >= cell.phase_img.shape[0]:
+            ymin = cell.phase_img.shape[1] - 81
+            ymax = cell.phase_img.shape[1] - 1
+
         xs = np.concatenate([
             cell.mesh[:, 0],
             cell.mesh[:, 2]
         ])
         ys = np.concatenate([
             cell.mesh[:, 1],
-            cell.mesh[:, 2]
+            cell.mesh[:, 3]
         ])
         xdis = xs - xmin
         if np.any(xdis < 0):

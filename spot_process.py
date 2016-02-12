@@ -209,15 +209,28 @@ class InteractivePlot(object):
         self.redraw()
 
     def draw_cell(self):
+        img = self.get_img()
+
         # centre = self.current_cell.centre
         centre = track.Lineage.get_mesh_centre(None, self.current_cell)
         rang = 40
         xmin = centre[0] - rang
         xmax = centre[0] + rang
+        if xmin < 0:
+            xmin = 0
+            xmax = rang * 2
+        elif xmax >= img.shape[0]:
+            xmin = img.shape[0] - (rang * 2) - 1
+            xmax = img.shape[0] - 1
         ymin = centre[1] - rang
         ymax = centre[1] + rang
+        if ymin < 0:
+            ymin = 0
+            ymax = rang * 2
+        elif ymax >= img.shape[1]:
+            ymin = img.shape[1] - (rang * 2) - 1
+            ymax = img.shape[1] - 1
 
-        img = self.get_img()
         img[np.isnan(img)] = 0
         roi = img[ymin:ymax, xmin:xmax]
         img[img > np.nanmax(roi)] = np.nanmax(roi)
