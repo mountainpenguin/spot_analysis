@@ -704,6 +704,10 @@ def main(noplot=False, wanted=True, target="ParB"):
 
 
 if __name__ == "__main__":
+    if "-n" in sys.argv:
+        noplot = True
+    else:
+        noplot = False
     if "-w" in sys.argv:
         # ignore wanted file
         wanted = False
@@ -714,4 +718,4 @@ if __name__ == "__main__":
         target = "ParA"
     else:
         target = "ParB"
-    main(wanted=wanted, target=target)
+    main(wanted=wanted, target=target, noplot=noplot)

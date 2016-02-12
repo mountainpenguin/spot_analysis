@@ -532,9 +532,9 @@ def main():
 
     targetfiles = sorted(glob.glob("data/cell_lines/lineage*.npy"))
     for targetfile in targetfiles:
-        cell_line = np.load(targetfile)
         lineage_num = int(re.search("lineage(\d+)\.npy", targetfile).group(1))
         if lineage_num in wantedlineages:
+            cell_line = np.load(targetfile)
             plot_images(cell_line, lineage_num)
             plot_graphs(cell_line, lineage_num, num_plots=num_plots)
             print("Generated plots for lineage {0}".format(lineage_num))
