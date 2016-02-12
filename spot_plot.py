@@ -171,8 +171,8 @@ def decorate_daughters(cell_line, lineage, ax, pad=10):
     children_ids = parent_cell.children
     if children_ids:
         # get info for id
-        child1 = lineage.frames.cell(children_ids[0])
-        child2 = lineage.frames.cell(children_ids[1])
+        child1 = lineage.frames.cell(children_ids[1])
+        child2 = lineage.frames.cell(children_ids[0])
 
         ldiff = (child1.length[0][0] + child2.length[0][0] -
                  parent_cell.length[0][0])
@@ -198,9 +198,9 @@ def decorate_daughters(cell_line, lineage, ax, pad=10):
             np.abs(np.sum(parent_pupper - child2_pupper)),
             np.abs(np.sum(parent_pupper - child2_plower)),
         ])
-        if child1_dist < child2_dist:
-            child1 = lineage.frames.cell(children_ids[1])
-            child2 = lineage.frames.cell(children_ids[0])
+        if child1_dist > child2_dist:
+            child1 = lineage.frames.cell(children_ids[0])
+            child2 = lineage.frames.cell(children_ids[1])
 
         # width should be approx. an 18th of the total xrange
         if len(cell_line[0].t) == 1:
