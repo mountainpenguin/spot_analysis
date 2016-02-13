@@ -49,12 +49,21 @@ def _fmt_img(ax, mesh, xlim, ylim):
     _deaxis(ax)
 
 
-def plot_images(cell_line, lineage_num):
+def plot_images(cell_line, lineage_num, plot_parA=True):
     grid_width = len(cell_line)
     fig = plt.figure(figsize=(grid_width * 5, 20))
     fig.patch.set_alpha(0)
     gs = matplotlib.gridspec.GridSpec(4, grid_width)
     sp_num = 0
+
+    parA_row = 1
+    parB_row = 2
+    linescan_row = 3
+
+    if not plot_parA:
+        parB_row = 1
+        linescan_row = 2
+
     for cell in cell_line:
         # xmin, xmax for each image
         # centre +/- 40
@@ -105,24 +114,25 @@ def plot_images(cell_line, lineage_num):
         ax.imshow(cell.phase_img, cmap=plt.cm.gray)
         _fmt_img(ax, cell.mesh, (xmin, xmax), (ymax, ymin))
 
-        # plot ParA in RGB red with white mesh
-        ax = fig.add_subplot(gs[1, sp_num:sp_num + 1])
-        red_chan = cell.parA_img_bg / np.nanmax(cell.parA_img_bg[ymin:ymax, xmin:xmax])
-        red_chan[red_chan > 1] = 1
-        parA_img = np.dstack((
-            red_chan,
-            np.zeros(cell.parA_img.shape),
-            np.zeros(cell.parA_img.shape)
-        ))
-        ax.imshow(parA_img)
+        if plot_parA:
+            # plot ParA in RGB red with white mesh
+            ax = fig.add_subplot(gs[parA_row, sp_num:sp_num + 1])
+            red_chan = cell.parA_img_bg / np.nanmax(cell.parA_img_bg[ymin:ymax, xmin:xmax])
+            red_chan[red_chan > 1] = 1
+            parA_img = np.dstack((
+                red_chan,
+                np.zeros(cell.parA_img.shape),
+                np.zeros(cell.parA_img.shape)
+            ))
+            ax.imshow(parA_img)
 
-        # plot ParA focus as white spot
-        x, y = cell.M_x[cell.ParA[0]], cell.M_y[cell.ParA[0]]
-        plt.plot(x, y, "wo", ms=10)
-        _fmt_img(ax, cell.mesh, (xmin, xmax), (ymax, ymin))
+            # plot ParA focus as white spot
+            x, y = cell.M_x[cell.ParA[0]], cell.M_y[cell.ParA[0]]
+            plt.plot(x, y, "wo", ms=10)
+            _fmt_img(ax, cell.mesh, (xmin, xmax), (ymax, ymin))
 
         # plot ParB in RGB green with white mesh
-        ax = fig.add_subplot(gs[2, sp_num:sp_num + 1])
+        ax = fig.add_subplot(gs[parB_row, sp_num:sp_num + 1])
         green_chan = cell.parB_img_bg / np.nanmax(cell.parB_img_bg[ymin:ymax, xmin:xmax])
         green_chan[green_chan > 1] = 1
         parB_img = np.dstack((
@@ -138,7 +148,7 @@ def plot_images(cell_line, lineage_num):
         _fmt_img(ax, cell.mesh, (xmin, xmax), (ymax, ymin))
 
         # plot line-scan profile
-        ax = fig.add_subplot(gs[3, sp_num:sp_num + 1])
+        ax = fig.add_subplot(gs[linescan_row, sp_num:sp_num + 1])
         # X=position, Y=intensity
         # smoothed in black
         # unsmoothed in gray
@@ -266,6 +276,66 @@ def decorate_daughters(cell_line, lineage, ax, pad=10):
                 parent_cell.length / 2 + 1
             )
         )
+
+
+def plot_graphs_parB_only(cell_line, lineage_num):
+    L = np.array([x.length[0][0] for x in cell_line])
+    T = shared.get_timings()
+    t = np.array(T[cell_line[0].frame - 1:cell_line[-1].frame])
+
+    lineage = track.Lineage()
+    fig = plt.figure()
+    ax_parB = fig.add_subplot(111)
+    _despine(ax_parB)
+    ax_parB.set_title("ParB")
+    ax_parB.plot(t, L / 2, "k-", lw=2, label="Cell poles")
+    ax_parB.plot(t, -(L / 2), "k-", lw=2)
+
+    spots_ParB = shared.get_parB_path(cell_line, T, lineage_num)
+    spotnum = 1
+    colourwheel = sns.color_palette(n_colors=len(spots_ParB))
+    for x in spots_ParB:
+        colour = colourwheel[spotnum - 1]
+        s = x.spots(False)
+        if hasattr(x, "split_parent") and x.split_parent:
+            for y in spots_ParB:
+                if y.spot_ids[-1] == x.split_parent:
+                    textra = y.timing[-1:]
+                    timings = np.concatenate([textra, s["timing"]])
+                    posextra = y.position[-1:]
+                    positions = np.concatenate([posextra, s["position"]])
+                    break
+        else:
+            timings = s["timing"]
+            positions = s["position"]
+
+        ax_parB.plot(
+            timings, positions,
+            lw=2, marker=".",
+            mec="k", ms=10,
+            label="Spot {0}".format(spotnum),
+            color=colour
+        )
+        spotnum += 1
+
+    lines = ax_parB.lines[::-1]
+    for l in lines:
+        ax_parB.lines.remove(l)
+        ax_parB.add_line(l)
+
+    ax_parB.set_ylabel(r"Distance from mid-cell (px)")
+    ax_parB.set_xlabel(r"Time (min)")
+
+    decorate_daughters(cell_line, lineage, ax_parB, pad=5)
+
+    ax_parB.legend(bbox_to_anchor=(1.35, 1))
+    ax_parB.patch.set_alpha(0)
+
+    plt.tight_layout()
+    fn = "data/data-lineage{0:02d}.pdf".format(lineage_num)
+    plt.savefig(fn)
+    print("Saved data file to {0}".format(fn))
+    plt.close()
 
 
 def plot_graphs(cell_line, lineage_num, num_plots=5):
@@ -535,8 +605,11 @@ def main():
         lineage_num = int(re.search("lineage(\d+)\.npy", targetfile).group(1))
         if lineage_num in wantedlineages:
             cell_line = np.load(targetfile)
-            plot_images(cell_line, lineage_num)
-            plot_graphs(cell_line, lineage_num, num_plots=num_plots)
+            if "-b" in sys.argv:
+                plot_images(cell_line, lineage_num, plot_parA=False)
+                plot_graphs_parB_only(cell_line, lineage_num)
+            else:
+                plot_graphs(cell_line, lineage_num, num_plots=num_plots)
             print("Generated plots for lineage {0}".format(lineage_num))
 
 if __name__ == "__main__":
