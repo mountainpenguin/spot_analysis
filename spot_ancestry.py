@@ -83,6 +83,12 @@ def plot_lineages(bonly=False):
                 generations[current_num] = gen
 
                 if daughters:
+                    d1 = lineage.frames.cell(daughters[0]).length[0][0]
+                    d2 = lineage.frames.cell(daughters[1]).length[0][0]
+                    max_len_ = max([max_len_, d1 + d2])
+                    if max_len_ > max_len:
+                        max_len = float(max_len_)
+
                     d1n = cells[daughters[0]]
                     d2n = cells[daughters[1]]
                     buff.append(d1n)

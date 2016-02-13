@@ -1,13 +1,27 @@
 #!/usr/bin/env python
 
 import spot_plot
+import spot_ancestry
 import get_parA
 import os
 import json
 import numpy as np
+import sys
 
 
-def main():
+def ancestry():
+    wanted = json.loads(open("wanted.json").read())
+    original_path = os.path.abspath(os.getcwd())
+    for d, v in wanted.items():
+        for subdir in v:
+            path = os.path.abspath(os.path.join(d, subdir))
+            print("Processing path:", path)
+            os.chdir(path)
+            spot_ancestry.plot_lineages()
+            os.chdir(original_path)
+
+
+def normal():
     wanted = json.loads(open("wanted.json").read())
     original_path = os.path.abspath(os.getcwd())
     for d, v in wanted.items():
@@ -39,4 +53,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if "-ancestry" in sys.argv:
+        ancestry()
+    else:
+        normal()

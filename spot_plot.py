@@ -447,7 +447,11 @@ def plot_graphs(cell_line, lineage_num, num_plots=5, parA_heatmap=None, save=Tru
 
     spots_ParB = shared.get_parB_path(cell_line, T, lineage_num)
     spotnum = 1
-    colourwheel = sns.color_palette(n_colors=len(spots_ParB))
+    if len(spots_ParB) == 1:
+        n_colors = 2
+    else:
+        n_colors = len(spots_ParB)
+    colourwheel = sns.color_palette(n_colors=n_colors)
     for x in spots_ParB:
         colour = colourwheel[spotnum - 1]
         s = x.spots(False)
