@@ -278,16 +278,21 @@ def decorate_daughters(cell_line, lineage, ax, pad=10):
         )
 
 
-def plot_graphs_parB_only(cell_line, lineage_num):
+def plot_graphs_parB_only(cell_line, lineage_num, ax_parB=None, save=True):
     L = np.array([x.length[0][0] for x in cell_line])
     T = shared.get_timings()
     t = np.array(T[cell_line[0].frame - 1:cell_line[-1].frame])
 
     lineage = track.Lineage()
-    fig = plt.figure()
-    ax_parB = fig.add_subplot(111)
-    _despine(ax_parB)
-    ax_parB.set_title("ParB")
+
+    if not ax_parB:
+        fig = plt.figure()
+        ax_parB = fig.add_subplot(111)
+        _despine(ax_parB)
+        ax_parB.set_title("ParB")
+        ax_parB.set_ylabel(r"Distance from mid-cell (px)")
+        ax_parB.set_xlabel(r"Time (min)")
+
     ax_parB.plot(t, L / 2, "k-", lw=2, label="Cell poles")
     ax_parB.plot(t, -(L / 2), "k-", lw=2)
 
@@ -323,27 +328,25 @@ def plot_graphs_parB_only(cell_line, lineage_num):
         ax_parB.lines.remove(l)
         ax_parB.add_line(l)
 
-    ax_parB.set_ylabel(r"Distance from mid-cell (px)")
-    ax_parB.set_xlabel(r"Time (min)")
-
     decorate_daughters(cell_line, lineage, ax_parB, pad=5)
 
-    ax_parB.legend(bbox_to_anchor=(1.35, 1))
-    ax_parB.patch.set_alpha(0)
+    if save:
+        ax_parB.legend(bbox_to_anchor=(1.35, 1))
+        ax_parB.patch.set_alpha(0)
 
-    plt.tight_layout()
-    fn = "data/data-lineage{0:02d}.pdf".format(lineage_num)
-    plt.savefig(fn)
-    print("Saved data file to {0}".format(fn))
-    plt.close()
+        plt.tight_layout()
+        fn = "data/data-lineage{0:02d}.pdf".format(lineage_num)
+        plt.savefig(fn)
+        print("Saved data file to {0}".format(fn))
+        plt.close()
 
 
-def plot_graphs(cell_line, lineage_num, num_plots=5):
+def plot_graphs(cell_line, lineage_num, num_plots=5, parA_heatmap=None, save=True):
     lineage = track.Lineage()
-    fig = plt.figure(figsize=(20, 10))
-    gs = matplotlib.gridspec.GridSpec(2, 3)
-
-    fig.patch.set_alpha(0)
+    if save:
+        fig = plt.figure(figsize=(20, 10))
+        gs = matplotlib.gridspec.GridSpec(2, 3)
+        fig.patch.set_alpha(0)
 
     spots_ParA = []
     traces_ParA = []
@@ -362,8 +365,9 @@ def plot_graphs(cell_line, lineage_num, num_plots=5):
     end = cell_line[-1].frame - 1
     t = np.array(T[start:end + 1])
 
-    parA_heatmap = fig.add_subplot(gs[0, 0])
-    _despine(parA_heatmap)
+    if save:
+        parA_heatmap = fig.add_subplot(gs[0, 0])
+        _despine(parA_heatmap)
     # use Rectangles to generate a heatmap
     i = 0
     cmapper = plt.cm.get_cmap("afmhot")
@@ -390,9 +394,10 @@ def plot_graphs(cell_line, lineage_num, num_plots=5):
             i2 += 1
         i += 1
 
-    parA_heatmap.set_ylabel(r"Distance from mid-cell (px)")
-    parA_heatmap.set_xlabel(r"Time (min)")
-    parA_heatmap.set_title("ParA")
+    if save:
+        parA_heatmap.set_ylabel(r"Distance from mid-cell (px)")
+        parA_heatmap.set_xlabel(r"Time (min)")
+        parA_heatmap.set_title("ParA")
 
     parA_heatmap.plot(t, L / 2, "k-", lw=2)
     parA_heatmap.plot(t, -(L / 2), "k-", lw=2)
@@ -501,10 +506,11 @@ def plot_graphs(cell_line, lineage_num, num_plots=5):
         parB_midcell.legend(bbox_to_anchor=(1.35, 1))
         parB_midcell.patch.set_alpha(0)
     else:
-        parA_heatmap.legend(
-            [parA_heatmap.lines[-1]], [parA_heatmap.lines[-1].get_label()],
-            bbox_to_anchor=(1.2, 1)
-        )
+        if save:
+            parA_heatmap.legend(
+                [parA_heatmap.lines[-1]], [parA_heatmap.lines[-1].get_label()],
+                bbox_to_anchor=(1.2, 1)
+            )
 
     if num_plots >= 4:
         filtered = [x for x in spots_ParB if len(x) > 4]
@@ -568,17 +574,16 @@ def plot_graphs(cell_line, lineage_num, num_plots=5):
         else:
             ax_parA.legend(bbox_to_anchor=(1.65, 1))
 
-    plt.tight_layout()
-    fn = "data/data-lineage{0:02d}.pdf".format(lineage_num)
-    plt.savefig(fn)
-    print("Saved data file to {0}".format(fn))
-
-    plt.close()
+    if save:
+        plt.tight_layout()
+        fn = "data/data-lineage{0:02d}.pdf".format(lineage_num)
+        plt.savefig(fn)
+        print("Saved data file to {0}".format(fn))
 
 
 def main():
     if "-w" in sys.argv:
-        wantedlineages = range(100)
+        wantedlineages = range(1000)
     else:
         wantedfile = json.loads(open(
             "../../wanted.json"
