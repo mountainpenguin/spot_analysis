@@ -270,6 +270,9 @@ class InteractivePlot(object):
         self.draw_cell()
         self.mode_default()
 
+    def remove_all_spots(self):
+        self.current_cell.ParB = []
+
     def pick_event(self, event):
         if self.MODE == "remove":
             event.artist.set_color("r")
@@ -363,6 +366,9 @@ class InteractivePlot(object):
                 self.mode_remove()
             elif event.key == "t":
                 self.mode_replace()
+            elif event.key == "R":
+                self.remove_all_spots()
+                self.mode_default()
 
         elif self.MODE == "add":
             if event.key == "escape":
@@ -621,6 +627,7 @@ class InteractivePlotB(InteractivePlot):
         ("Enter", "Next cell", "enter"),
         ("a", "Add Mode", "a"),
         ("r", "Remove Mode", "r"),
+        ("R", "Remove all", "R"),
     ]
 
     def determine_par_path(self, force=False):
