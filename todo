@@ -1,11 +1,15 @@
 - really make sure daughter cell orientations are correct
 - units in um rather than pixels
-- plot parA/parB position in parent and daughter cells of lineages (images and graphs)
-- combine ParA and ParB plots (ParB superimposed on ParA heatmap, no maximum line)
 - remove distance from ParA and pole plots
 - 'speed' of ParB: 'moving' and 'static' spots cf. to elongation rate
-- define old/new poles
+- define old/new poles: orient all cell plots with new pole at top?
+- scale heatmap intensities over all ancestries
 
-- what is ParA doing when minicells are performed
-- % cells where ParA is present at the future septum in the frame before division
+- what is ParA doing when minicells are formed?
+- % cells where ParA is not present at the future division place in the frame before division
+
+- variation in septum placement
+- variation in final size
+- asymmetry in ParA partioning -> diff. in fluor and change in fluorescence of each daughter
+
 - cell length at ParB split point
