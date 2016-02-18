@@ -55,5 +55,8 @@ def normal():
 if __name__ == "__main__":
     if "-ancestry" in sys.argv:
         ancestry()
+    if "-both" in sys.argv:
+        normal()
+        ancestry()
     else:
         normal()
