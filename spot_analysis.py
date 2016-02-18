@@ -201,9 +201,17 @@ class Analysis(track.Lineage):
         # s = np.std(F)
 
         cell.parA_fluorescence_smoothed = F2 - f2.mean()
-        cell.parA_fluorescence_unsmoothed = F_unsmoothed - f2.mean()
+        cell.parA_fluorescence_unsmoothed = F2_unsmoothed - f2.mean()
         cell.parB_fluorescence_smoothed = F - bg
         cell.parB_fluorescence_unsmoothed = F_unsmoothed - bg
+
+        # ParA peak is the maximum value
+        _parA = np.array(F2).argmax()
+        ParA_max = _parA, F2[_parA]
+
+        if not self.PARB_EXISTS:
+            ParA_val = ((ParA_max[0] / i[-1]) * cell.length[0][0], ParA_max[1], cell.length[0][0])
+            return ParA_val, []
 
         # argrelextrema peak-finding method
 #        np.save("test{0:02d}".format(cell.frame - 19), [F - bg, F_unsmoothed - bg])
@@ -252,10 +260,6 @@ class Analysis(track.Lineage):
         ParB_vals = [
             (i[_z], (F - bg)[_z]) for _z in peaks if (F - bg)[_z] > m
         ]
-
-        # ParA peak is the maximum value
-        _parA = np.array(F2).argmax()
-        ParA_max = _parA, F2[_parA]
 
         # check distances between peaks
         if len(ParB_vals) > 1:
@@ -371,12 +375,16 @@ class Analysis(track.Lineage):
         dimensions = scipy.misc.imread(self.phase[0]).shape
         if not fluor:  # ParB
             self.fluor = FakeImages(dimensions)
+            self.PARB_EXISTS = False
         else:
             self.fluor = fluor
+            self.PARB_EXISTS = True
         if not fluor2:  # ParA
             self.fluor2 = FakeImages(dimensions)
+            self.PARA_EXISTS = False
         else:
             self.fluor2 = fluor2
+            self.PARA_EXISTS = True
 
         self.T = shared.get_timings()
         cell_line_num = 1
