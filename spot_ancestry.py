@@ -10,6 +10,10 @@ from lineage_lib import track
 import spot_plot
 import matplotlib.pyplot as plt
 import matplotlib.gridspec
+import networkx as nx
+from networkx.drawing.nx_agraph import graphviz_layout
+import seaborn as sns
+sns.set_style("white")
 
 
 def getNumByID(cell_id):
@@ -52,7 +56,7 @@ def plot_lineages(bonly=False):
 
         print("Processing lineage {0}".format(lineage_num))
         cell_line_nums = []
-        cell_line_positions = {}
+#        cell_line_positions = {}
         cell_lines = {}
         cell_parents = {}
         designations = {
@@ -62,6 +66,10 @@ def plot_lineages(bonly=False):
         buff = []
         generations = {}
         max_len = 0
+
+        graph = nx.DiGraph()
+        labels = {}
+
         while True:
             if current_num:
                 mother_line = np.load("data/cell_lines/lineage{0:02d}.npy".format(current_num))
@@ -81,6 +89,12 @@ def plot_lineages(bonly=False):
                     _temp_num = cell_parents[_temp_num]
                     gen += 1
                 generations[current_num] = gen
+
+                if mother_line[0].parent:
+                    graph.add_edge(mother_line[0].parent, mother_line[-1].id)
+                else:
+                    graph.add_node(mother_line[-1].id)
+                labels[mother_line[-1].id] = current_num
 
                 if daughters:
                     d1 = lineage.frames.cell(daughters[0]).length[0][0]
@@ -157,8 +171,8 @@ def plot_lineages(bonly=False):
 #            i += 1
 #
 
-        num_rows = int(round(np.sqrt(len(cell_lines))))
-        if num_rows ** 2 < len(cell_lines):
+        num_rows = int(round(np.sqrt(len(cell_lines) + 1)))
+        if num_rows ** 2 < len(cell_lines) + 1:
             gridspec = matplotlib.gridspec.GridSpec(num_rows + 1, num_rows)
         else:
             gridspec = matplotlib.gridspec.GridSpec(num_rows, num_rows)
@@ -195,12 +209,30 @@ def plot_lineages(bonly=False):
             already_plotted.append(cell_line_num)
             i += 1
 
+        # add network plot
+        sp = matplotlib.gridspec.SubplotSpec(gridspec, i)
+        ax = fig.add_subplot(sp)
+        ax.set_title("Tree")
+        spot_plot._despine(ax)
+        pos = graphviz_layout(graph, prog="dot")
+        nx.draw_networkx_labels(
+            graph, pos, labels=labels,
+            font_size=10,
+            font_weight="bold",
+        )
+        nx.draw(
+            graph, pos, arrows=False,
+            node_color=sns.color_palette()[0],
+            width=2,
+        )
+
         plt.tight_layout()
 
         os.makedirs("data/full_lineages", exist_ok=True)
         plt.savefig("data/full_lineages/lineage{0:02d}.pdf".format(lineage_num))
 
         print("Done with tree starting from {0}".format(lineage_num))
+
 
 def main():
     if "plot" in sys.argv:
