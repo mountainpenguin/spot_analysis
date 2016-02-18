@@ -286,7 +286,7 @@ def plot_graphs_parB_only(cell_line, lineage_num, ax_parB=None, save=True):
     lineage = track.Lineage()
 
     if not ax_parB:
-        fig = plt.figure()
+        fig = plt.figure(figsize=(20 / 3, 5))
         ax_parB = fig.add_subplot(111)
         _despine(ax_parB)
         ax_parB.set_title("ParB")
@@ -615,10 +615,15 @@ def main():
         if lineage_num in wantedlineages:
             cell_line = np.load(targetfile)
             if "-b" in sys.argv:
-                plot_images(cell_line, lineage_num, plot_parA=False)
-                plot_graphs_parB_only(cell_line, lineage_num)
+                if "-noimage" not in sys.argv:
+                    plot_images(cell_line, lineage_num, plot_parA=False)
+                if "-nograph" not in sys.argv:
+                    plot_graphs_parB_only(cell_line, lineage_num)
             else:
-                plot_graphs(cell_line, lineage_num, num_plots=num_plots)
+                if "-noimage" not in sys.argv:
+                    plot_images(cell_line, lineage_num)
+                if "-nograph" not in sys.argv:
+                    plot_graphs(cell_line, lineage_num, num_plots=num_plots)
             print("Generated plots for lineage {0}".format(lineage_num))
 
 if __name__ == "__main__":
