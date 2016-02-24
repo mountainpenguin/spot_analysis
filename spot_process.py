@@ -219,21 +219,67 @@ class InteractivePlot(object):
         if xmin < 0:
             xmin = 0
             xmax = rang * 2
-        elif xmax >= img.shape[0]:
-            xmin = img.shape[0] - (rang * 2) - 1
-            xmax = img.shape[0] - 1
+        elif xmax >= img.shape[1]:
+            xmin = img.shape[1] - (rang * 2) - 1
+            xmax = img.shape[1] - 1
         ymin = centre[1] - rang
         ymax = centre[1] + rang
         if ymin < 0:
             ymin = 0
             ymax = rang * 2
-        elif ymax >= img.shape[1]:
-            ymin = img.shape[1] - (rang * 2) - 1
-            ymax = img.shape[1] - 1
+        elif ymax >= img.shape[0]:
+            ymin = img.shape[0] - (rang * 2) - 1
+            ymax = img.shape[0] - 1
 
         img[np.isnan(img)] = 0
-        roi = img[ymin:ymax, xmin:xmax]
+        ## general area method
+#        roi = img[ymin:ymax, xmin:xmax]
+
+        ## bounding box method
+#        roi_xs = np.dstack([self.current_cell.mesh[:, 0], self.current_cell.mesh[:, 2]])
+#        roi_x1 = roi_xs.min()
+#        roi_x2 = roi_xs.max()
+#        roi_ys = np.dstack([self.current_cell.mesh[:, 1], self.current_cell.mesh[:, 3]])
+#        roi_y1 = roi_ys.min()
+#        roi_y2 = roi_ys.max()
+#        roi = img[roi_y1:roi_y2, roi_x1:roi_x2]
+
+        ## polygon method
+        vertices = np.vstack([
+            np.concatenate([self.current_cell.mesh[:, 0], self.current_cell.mesh[:, 2]]),
+            np.concatenate([self.current_cell.mesh[:, 1], self.current_cell.mesh[:, 3]]),
+        ]).T
+        num_r, num_c = img.shape
+        ygrid, xgrid = np.mgrid[:num_r, :num_c]
+        xycoords = np.vstack((xgrid.ravel(), ygrid.ravel())).T
+        roi_path = matplotlib.path.Path(vertices, closed=False)
+        roi_mask = roi_path.contains_points(xycoords)
+        roi_mask = roi_mask.reshape(img.shape)
+        roi = np.ma.masked_array(img, ~roi_mask)
+
+        # debug
+#        plt.figure()
+#        ax = plt.subplot(131)
+#        plt.imshow(self.current_cell.phase_img, cmap=plt.cm.gray)
+#        plt.plot(self.current_cell.mesh[:, 0], self.current_cell.mesh[:, 1], "k-")
+#        plt.plot(self.current_cell.mesh[:, 2], self.current_cell.mesh[:, 3], "k-")
+#
+#        r = matplotlib.patches.Rectangle(
+#            (roi_x1, roi_y1),
+#            width=roi_x2 - roi_x1,
+#            height=roi_y2 - roi_y1,
+#            facecolor="none",
+#            lw=2
+#        )
+#        plt.gca().add_artist(r)
+#
+#        plt.subplot(132, sharex=ax, sharey=ax)
+#        plt.imshow(roi, cmap=plt.cm.gray)
+#        plt.show()
+        # end debug
+
         img[img > np.nanmax(roi)] = np.nanmax(roi)
+
         self.img_plot.imshow(img, cmap=plt.cm.viridis)
         self.img_plot.plot(self.current_cell.mesh[:, 0], self.current_cell.mesh[:, 1], "k-")
         self.img_plot.plot(self.current_cell.mesh[:, 2], self.current_cell.mesh[:, 3], "k-")
