@@ -1,6 +1,7 @@
 - define old/new poles: orient all cell plots with new pole at top?
 - really make sure daughter cell orientations are correct
 - units in um rather than pixels
+- fix network in ancestry plots
 - 'speed' of ParB: 'moving' and 'static' spots cf. to elongation rate
 - variation in size at division
 - variation in septum placement 
