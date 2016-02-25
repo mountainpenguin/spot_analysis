@@ -1,15 +1,22 @@
+- define old/new poles: orient all cell plots with new pole at top?
 - really make sure daughter cell orientations are correct
 - units in um rather than pixels
-- remove distance from ParA and pole plots
 - 'speed' of ParB: 'moving' and 'static' spots cf. to elongation rate
-- define old/new poles: orient all cell plots with new pole at top?
-- scale heatmap intensities over all ancestries
-
-- what is ParA doing when minicells are formed?
+- variation in size at division
+- variation in septum placement 
+    difference in daughter cell size
 - % cells where ParA is not present at the future division place in the frame before division
-
-- variation in septum placement
-- variation in final size
-- asymmetry in ParA partioning -> diff. in fluor and change in fluorescence of each daughter
-
-- cell length at ParB split point
+    requires some sort of local thresholding?
+- asymmetry in ParA partioning
+    diff. in fluor and change in fluorescence of each daughter
+- cell length / age at ParB split point
+- ParA localisation 
+    sum over all cells at particular stages, relative to old/new pole
+- ParB localisation at division/birth, relative to new pole (septum)
+    sum as for ParA
+- ParB movement vs ParA 'local' gradient
+- ParB movement vs diffusion (<(change in x)^2> ~ 2D(change in t)
+    plot <(change in x)^2> for all time windows vs time window size?
+- what is ParA doing when minicells are formed?
+- scale heatmap intensities over all ancestries
+- ParA/B model to predict minicell/anuclear cell frequencies
