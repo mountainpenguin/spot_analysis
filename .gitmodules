@@ -1,3 +1,4 @@
 [submodule "lineage"]
-	path = lineage
-	url = git@github.com:mountainpenguin/lineage.git
+    path = lineage
+    url = git@github.com:mountainpenguin/lineage.git
+    branch = master
