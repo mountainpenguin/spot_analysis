@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from lineage_lib import track
+from lineage_lib import poles
 from analysis_lib import shared
 import spot_plot
 import spot_spread
@@ -64,6 +65,7 @@ class Analysis(track.Lineage):
         self.SKIP = skip
         self.NO_IMAGE = noimage
         track.Lineage.__init__(self)
+        self.POLES = poles.PoleAssign(self.frames).assign_poles()
 
     def apply_alignments(self):
         f = 0
@@ -147,18 +149,12 @@ class Analysis(track.Lineage):
 
         # _p = lambda x: if x > len(F) // 2: return len(F) - x else return x
 
-    def get_spots(self, cell, orientation=True):
+    def get_spots(self, cell):
         frame_idx = cell.frame - 1
         xs_l = cell.mesh[:, 0]
         ys_l = cell.mesh[:, 1]
         xs_r = cell.mesh[:, 2]
         ys_r = cell.mesh[:, 3]
-
-        if not orientation:
-            xs_l = xs_l[::-1]
-            ys_l = ys_l[::-1]
-            xs_r = xs_r[::-1]
-            ys_r = ys_r[::-1]
 
         f = scipy.misc.imread(self.fluor[frame_idx])
         f_denoise = self.process_fluor(f)
@@ -400,14 +396,25 @@ class Analysis(track.Lineage):
             S_A = []
             S_B = []
             prior = None
+            pole_assignment = self.POLES[cell_line[0].id]
             for cell in cell_line:
                 L.append(cell.length[0][0])
+                orientation = True
                 if prior:
                     orientation = self.get_orientation(cell, prior)
+                    if not orientation:
+                        cell.mesh = cell.mesh[::-1]
+
+                # check pole assignment
+                if pole_assignment == -1:
+                    cell.mesh = cell.mesh[::-1]
+                    cell.pole_assignment = True
+                elif pole_assignment == 0:
+                    cell.pole_assignment = True
                 else:
-                    orientation = True
-                cell.orientation = orientation
-                spot_ParA, spots_ParB = self.get_spots(cell, orientation)
+                    cell.pole_assignment = False
+
+                spot_ParA, spots_ParB = self.get_spots(cell)
                 cell.ParA = spot_ParA
                 # spot_ParA:
                 #  distance from pole
@@ -435,12 +442,8 @@ class Analysis(track.Lineage):
             sp_num = 0
             while frame_num <= end:
                 mesh = cell_line[sp_num].mesh
-                if cell_line[sp_num].orientation:
-                    M_x = (mesh[:, 0] + mesh[:, 2]) / 2
-                    M_y = (mesh[:, 1] + mesh[:, 3]) / 2
-                else:
-                    M_x = (mesh[:, 0][::-1] + mesh[:, 2][::-1]) / 2
-                    M_y = (mesh[:, 1][::-1] + mesh[:, 3][::-1]) / 2
+                M_x = (mesh[:, 0] + mesh[:, 2]) / 2
+                M_y = (mesh[:, 1] + mesh[:, 3]) / 2
 
                 cell_line[sp_num].M_x = M_x
                 cell_line[sp_num].M_y = M_y

@@ -189,10 +189,7 @@ def decorate_daughters(cell_line, lineage, ax, pad=10):
 
         # determine which pole each child corresponds to
         # for cell1/cell2 assignment
-        if parent_cell.orientation:
-            parent_pupper = parent_cell.mesh[0]
-        else:
-            parent_pupper = parent_cell.mesh[-1]
+        parent_pupper = parent_cell.mesh[0]
 
         child1_pupper = child1.mesh[0]
         child1_plower = child1.mesh[-1]
