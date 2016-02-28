@@ -598,7 +598,7 @@ def main():
 
     num_plots = 5
     for x in sys.argv:
-        if "-n" in x:
+        if "-n" in x and x != "-nograph":
             num_plots = int(x.split("-n")[1])
             break
 
