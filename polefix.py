@@ -35,6 +35,8 @@ def main():
             if hasattr(cell, "orientation") and not cell.orientation:
                 print("mesh reversal", end=" ")
                 cell.mesh = cell.mesh[::-1]
+                cell.M_x = cell.M_x[::-1]
+                cell.M_y = cell.M_y[::-1]
 
             if pole_assignment == -1:
                 print("mesh reversal2 and fluor reversal")
@@ -49,8 +51,8 @@ def main():
                 #   parB_fluorescence_smoothed
                 #   parB_fluorescence_unsmoothed
 
-#                cell.M_x = cell.M_x[::-1]
-#                cell.M_y = cell.M_y[::-1]
+                cell.M_x = cell.M_x[::-1]
+                cell.M_y = cell.M_y[::-1]
 
                 cell.ParA = (cell.length[0][0] - cell.ParA[0], cell.ParA[1], cell.ParA[2])
                 cell.parA_fluorescence_smoothed = cell.parA_fluorescence_smoothed[::-1]
