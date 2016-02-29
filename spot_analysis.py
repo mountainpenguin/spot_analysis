@@ -397,6 +397,8 @@ class Analysis(track.Lineage):
             S_B = []
             prior = None
             pole_assignment = self.POLES[cell_line[0].id]
+            # only apply pole_assignment to first cell in lineage!
+            # rest use only orientation
             for cell in cell_line:
                 L.append(cell.length[0][0])
                 orientation = True
@@ -406,10 +408,9 @@ class Analysis(track.Lineage):
                         cell.mesh = cell.mesh[::-1]
 
                 # check pole assignment
-                if pole_assignment == -1:
+                if pole_assignment == -1 and not prior:
                     cell.mesh = cell.mesh[::-1]
-                    cell.pole_assignment = True
-                elif pole_assignment == 0:
+                if pole_assignment is not None:
                     cell.pole_assignment = True
                 else:
                     cell.pole_assignment = False
@@ -428,10 +429,7 @@ class Analysis(track.Lineage):
                 #  cell length
                 S_A.append(spot_ParA)
                 S_B.append(spots_ParB)
-                if orientation:
-                    prior = cell.mesh[0, 0:2], cell.mesh[-1, 0:2]
-                else:
-                    prior = cell.mesh[-1, 0:2], cell.mesh[0, 0:2]
+                prior = cell.mesh[0, 0:2], cell.mesh[-1, 0:2]
 
             start = cell_line[0].frame - 1
             end = cell_line[-1].frame - 1

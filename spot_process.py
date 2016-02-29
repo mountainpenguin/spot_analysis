@@ -283,6 +283,7 @@ class InteractivePlot(object):
         self.img_plot.imshow(img, cmap=plt.cm.viridis)
         self.img_plot.plot(self.current_cell.mesh[:, 0], self.current_cell.mesh[:, 1], "k-")
         self.img_plot.plot(self.current_cell.mesh[:, 2], self.current_cell.mesh[:, 3], "k-")
+        self.img_plot.plot(self.current_cell.mesh[0, 0], self.current_cell.mesh[0, 1], "y", marker="o", markersize=2)
 
         self.img_plot.set_xlim([xmin, xmax])
         self.img_plot.set_ylim([ymin, ymax])
