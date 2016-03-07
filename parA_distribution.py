@@ -19,7 +19,6 @@ import sys
 import json
 
 n_bins = 7
-n_len_bins = 31
 
 
 def get_cell_lines():
@@ -66,6 +65,8 @@ def remainder(cell_lines):
 
 def bin_cells(cell_lines, extra_firsts, extra_lasts):
     """ Bin cells according to cell cycle time """
+    n_len_bins = 30  # minimum value
+
     bins = dict(zip(
         range(n_bins),
         [[] for x in range(n_bins)]
@@ -82,6 +83,9 @@ def bin_cells(cell_lines, extra_firsts, extra_lasts):
         bin_count = 0
         bin_num = 1
         for cell in cell_line:
+            segments = len(cell.mesh)
+            if segments > n_len_bins:
+                n_len_bins = int(segments)
             if bin_count >= per_bin:
                 bin_num += 1
                 bin_count = 0
@@ -98,31 +102,101 @@ def bin_cells(cell_lines, extra_firsts, extra_lasts):
     for k, v in bins.items():
         print(" {0}: {1}".format(k, len(v)))
 
+    return bins, n_len_bins
 
-    return bins
+
+def resample_bins(cell, n_len_bins):
+    new_vals = np.zeros(n_len_bins)
+    new_bins = np.array(range(n_len_bins))
+    old_vals = cell.parA_fluorescence_unsmoothed
+    old_bins = np.array(range(len(old_vals)))
+    bin_width = len(old_bins) / (n_len_bins + 1)
+    new_bin_idx = 0
+    old_range = np.array([0, bin_width])
+    if len(old_bins) > n_len_bins:
+        # histogram is shrinking
+        while new_bin_idx < n_len_bins:
+            if old_range[0] != int(old_range[0]):
+                old1 = int(np.ceil(old_range[0]))
+                pre_rem = old1 - old_range[0]
+            else:
+                old1 = int(old_range[0])
+                pre_rem = 0
+
+            if old_range[1] != int(old_range[1]):
+                old2 = int(np.floor(old_range[1]))
+                post_rem = old_range[1] - old2
+            else:
+                old2 = int(old_range[1])
+                post_rem = 0
+
+            pre_val = old_vals[old1 - 1] * pre_rem
+            if old1 == old2:
+                mid_val = 0
+            else:
+                mid_val = old_vals[old1]
+            try:
+                post_val = old_vals[old2] * post_rem
+            except IndexError:
+                post_val = 0
+
+            new_val = pre_val + mid_val + post_val
+            new_val /= bin_width
+            new_vals[new_bin_idx] = new_val
+
+            old_range += bin_width
+            new_bin_idx += 1
+
+    elif len(old_bins) < n_len_bins:
+        while new_bin_idx < n_len_bins:
+            if old_range[0] != int(old_range[0]):
+                old1 = int(np.floor(old_range[0]))
+            else:
+                old1 = int(old_range[0])
+
+            if old_range[1] != int(old_range[1]):
+                old2 = int(np.floor(old_range[1]))
+            else:
+                old2 = int(old_range[1])
+
+            if old1 == old2:
+                new_val = bin_width * old_vals[old1]
+            else:
+                pre_val = (old2 - old_range[0]) * old_vals[old1]
+                try:
+                    post_val = (old_range[1] - old2) * old_vals[old2]
+                except IndexError:
+                    print("IndexError")
+                    post_val = 0
+                new_val = pre_val + post_val
+            new_val /= bin_width
+            new_vals[new_bin_idx] = new_val
+
+            old_range += bin_width
+            new_bin_idx += 1
+    else:
+        new_vals = old_vals
+
+    return new_vals, new_bins
 
 
-def normalise_bin(cells):
+def normalise_bin(cells, n_len_bins):
     """ normalise ParA by cell length """
     # split cell in 30 segments
     # return ParA values as % of cell length
     # normalise by intensity
     normalised = None
     for cell in cells:
-        pos_bins = range(n_len_bins)
-        max_pos = len(cell.parA_fluorescence_unsmoothed)
-        scaling = max_pos / n_len_bins
-        vals = np.array(range(len(cell.parA_fluorescence_unsmoothed))) / scaling
-        freq, _ = np.histogram(vals, bins=pos_bins, weights=cell.parA_fluorescence_unsmoothed)
+        rescaled_vals, rescaled_bins = resample_bins(cell, n_len_bins)
         if normalised is None:
-            normalised = freq
+            normalised = rescaled_vals
         else:
-            normalised += freq
+            normalised += rescaled_vals
     normalised = normalised / normalised.max()
     return normalised
 
 
-def plot_bins(bins, ax=None):
+def plot_bins(bins, n_len_bins, ax=None):
     cmapper = plt.cm.get_cmap("afmhot")
     vals = np.array([x for x in bins.values()])
     max_inten = vals.max()
@@ -150,14 +224,15 @@ def plot_bins(bins, ax=None):
 
 def process_cell_lines(cell_lines, extra_firsts, extra_lasts, ax=None):
     """ Processing after filtering """
-    bins = bin_cells(cell_lines, extra_firsts, extra_lasts)
+    bins, n_len_bins = bin_cells(cell_lines, extra_firsts, extra_lasts)
+    print("Number of cell length bins set to {0}".format(n_len_bins))
 
     bins_norm = {}
     for bin_num, cycle_bin in bins.items():
-        norm = normalise_bin(cycle_bin)
+        norm = normalise_bin(cycle_bin, n_len_bins)
         bins_norm[bin_num] = norm
 
-    plot_bins(bins_norm, ax)
+    plot_bins(bins_norm, n_len_bins, ax=ax)
 
 
 if __name__ == "__main__":
