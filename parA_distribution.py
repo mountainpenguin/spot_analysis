@@ -233,6 +233,7 @@ def process_cell_lines(cell_lines, extra_firsts, extra_lasts, ax=None):
         bins_norm[bin_num] = norm
 
     plot_bins(bins_norm, n_len_bins, ax=ax)
+    return n_len_bins
 
 
 if __name__ == "__main__":
@@ -266,8 +267,8 @@ if __name__ == "__main__":
         sys.exit(1)
 
     cell_lines, (firsts, lasts) = filter_cell_lines(cell_lines)
-    process_cell_lines(cell_lines, firsts, lasts)
+    n_len_bins = process_cell_lines(cell_lines, firsts, lasts)
     plt.xlabel("% of cell cycle")
     plt.ylabel("% distance from new pole")
     sns.despine()
-    plt.savefig("ParA_distribution.pdf")
+    plt.savefig("C={0},L={1},ParA_distribution.pdf".format(n_bins, n_len_bins))
