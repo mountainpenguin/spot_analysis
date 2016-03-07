@@ -13,6 +13,7 @@ import glob
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches
+import seaborn as sns
 
 n_bins = 7
 n_len_bins = 31
@@ -136,5 +137,7 @@ if __name__ == "__main__":
     cell_lines = get_cell_lines()
     cell_lines = filter_cell_lines(cell_lines)
     process_cell_lines(cell_lines)
-    plt.show()
-
+    plt.xlabel("% of cell cycle")
+    plt.ylabel("% distance from new pole")
+    sns.despine()
+    plt.savefig("ParA_distribution.pdf")
