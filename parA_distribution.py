@@ -20,6 +20,8 @@ import json
 
 n_bins = 7
 
+CHECK n_bins ASSIGNMENT IN `bin_cells`
+
 
 def get_cell_lines():
     # for now, just deal with one dir at a time
