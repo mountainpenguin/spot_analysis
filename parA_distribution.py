@@ -14,6 +14,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches
 import seaborn as sns
+import os
+import sys
+import json
 
 n_bins = 7
 n_len_bins = 31
@@ -37,11 +40,32 @@ def filter_cell_lines(cell_lines, criterion=None):
         last = cell_line[-1]
         if first.parent and last.children and len(cell_line) >= n_bins:
             out.append(cell_line)
-    print("Of which {0} are suitable for analysis".format(len(out)))
-    return out
+    print("Of which {0} are suitable for analysis (have both a parent and children)".format(len(out)))
+    return out, remainder(cell_lines)
 
 
-def bin_cells(cell_lines):
+def remainder(cell_lines):
+    firsts = []
+    lasts = []
+    for cell_line in cell_lines:
+        first = cell_line[0]
+        last = cell_line[-1]
+        if not first.parent and first.pole_assignment and last.children:
+            lasts.append(last)
+
+        if not last.children and last.pole_assignment and first.parent:
+            firsts.append(first)
+
+    print("There are an extra {0} cells which have no children "
+          "which can be added to the first bin".format(len(firsts)))
+    print("And an extra {0} cells which have known polarity but no parent "
+          "which can be added to the last bin".format(len(lasts)))
+
+    return firsts, lasts
+
+
+def bin_cells(cell_lines, extra_firsts, extra_lasts):
+    """ Bin cells according to cell cycle time """
     bins = dict(zip(
         range(n_bins),
         [[] for x in range(n_bins)]
@@ -67,9 +91,13 @@ def bin_cells(cell_lines):
             bins[bin_num].append(cell)
             bin_count += 1
 
+    bins[0].extend(extra_firsts)
+    bins[n_bins - 1].extend(extra_lasts)
+
     print("# cells in each bin:")
     for k, v in bins.items():
         print(" {0}: {1}".format(k, len(v)))
+
 
     return bins
 
@@ -91,7 +119,6 @@ def normalise_bin(cells):
         else:
             normalised += freq
     normalised = normalised / normalised.max()
-    # discard first bin
     return normalised
 
 
@@ -121,9 +148,9 @@ def plot_bins(bins, ax=None):
     ax.set_ylim([0, 100])
 
 
-def process_cell_lines(cell_lines, ax=None):
+def process_cell_lines(cell_lines, extra_firsts, extra_lasts, ax=None):
     """ Processing after filtering """
-    bins = bin_cells(cell_lines)
+    bins = bin_cells(cell_lines, extra_firsts, extra_lasts)
 
     bins_norm = {}
     for bin_num, cycle_bin in bins.items():
@@ -134,9 +161,37 @@ def process_cell_lines(cell_lines, ax=None):
 
 
 if __name__ == "__main__":
-    cell_lines = get_cell_lines()
-    cell_lines = filter_cell_lines(cell_lines)
-    process_cell_lines(cell_lines)
+    if os.path.exists("mt"):
+        # we're in a processable directory already
+        cell_lines = get_cell_lines()
+
+    elif os.path.exists("wanted.json"):
+        # we're not in a processable directory
+        # but we can process all directories
+        TLDs = json.loads(open("wanted.json").read()).keys()
+        orig_dir = os.getcwd()
+        cell_lines = []
+        for TLD in TLDs:
+            for subdir in os.listdir(TLD):
+                target = os.path.join(TLD, subdir)
+                target_mt = os.path.join(TLD, subdir, "mt", "mt.mat")
+                target_conf = [
+                    os.path.join(TLD, subdir, "mt", "mt.mat"),
+                    os.path.join(TLD, subdir, "data", "cell_lines", "lineage01.npy"),
+                ]
+                conf = [os.path.exists(x) for x in target_conf]
+                if os.path.isdir(target) and sum(conf) == len(conf):
+                    os.chdir(target)
+                    cell_lines.extend(get_cell_lines())
+                    os.chdir(orig_dir)
+        print("*** Got {0} cell lines from all directories".format(len(cell_lines)))
+
+    else:
+        print("Nothing to do, exiting")
+        sys.exit(1)
+
+    cell_lines, (firsts, lasts) = filter_cell_lines(cell_lines)
+    process_cell_lines(cell_lines, firsts, lasts)
     plt.xlabel("% of cell cycle")
     plt.ylabel("% distance from new pole")
     sns.despine()
