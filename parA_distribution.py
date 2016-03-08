@@ -17,10 +17,9 @@ import seaborn as sns
 import os
 import sys
 import json
+sns.set_style("white")
 
-n_bins = 7
-
-CHECK n_bins ASSIGNMENT IN `bin_cells`
+n_bins = 10
 
 
 def get_cell_lines():
@@ -84,18 +83,22 @@ def bin_cells(cell_lines, extra_firsts, extra_lasts):
 
         bin_count = 0
         bin_num = 1
+        cell_idx = 0
+        max_cells = len(cell_line) - 1
         for cell in cell_line:
             segments = len(cell.mesh)
             if segments > n_len_bins:
                 n_len_bins = int(segments)
-            if bin_count >= per_bin:
-                bin_num += 1
-                bin_count = 0
-            if bin_num >= n_bins - 1:
-                bin_num -= 1
 
-            bins[bin_num].append(cell)
-            bin_count += 1
+            if cell_idx > 0 and cell_idx < max_cells:
+                if bin_count >= per_bin:
+                    bin_num += 1
+                    bin_count = bin_count - per_bin
+                if bin_num >= n_bins - 1:
+                    bin_num -= 1
+                bins[bin_num].append(cell)
+                bin_count += 1
+            cell_idx += 1
 
     bins[0].extend(extra_firsts)
     bins[n_bins - 1].extend(extra_lasts)
@@ -198,13 +201,53 @@ def normalise_bin(cells, n_len_bins):
     return normalised
 
 
-def plot_bins(bins, n_len_bins, ax=None):
+def plot_bins(bins, n_len_bins, cycle_bins, ax=None):
     cmapper = plt.cm.get_cmap("afmhot")
     vals = np.array([x for x in bins.values()])
     max_inten = vals.max()
     if not ax:
         plt.figure()
-        ax = plt.subplot(111)
+        ax_top = plt.subplot2grid((15, 6), (0, 0), colspan=6)
+        sns.despine()
+        ax_main = plt.subplot2grid((15, 6), (1, 0), colspan=6, rowspan=6)
+        sns.despine()
+        ax_other = plt.subplot2grid((15, 6), (9, 0), colspan=6, rowspan=6)
+        sns.despine()
+
+    data = np.array([
+        (
+            (x[0] / n_bins) * 100,  # xval
+            len(x[1]),  # yval
+        ) for x in cycle_bins.items()
+    ])
+    bar_width = 100 / n_bins
+    bars = ax_top.bar(
+        data[:, 0],
+        data[:, 1],
+        bar_width
+    )
+
+    # label bars with n values
+    for bar in bars:
+        height = bar.get_height()
+        ax_top.text(
+            bar.get_x() + (bar.get_width() / 2),
+            1.05 * height,
+            "{0:d}".format(int(height)),
+            ha="center",
+            va="bottom"
+        )
+
+    ax_top.spines["bottom"].set_color("none")
+    ax_top.spines["left"].set_color("none")
+    ax_top.xaxis.set_visible(False)
+    ax_top.yaxis.set_visible(False)
+
+    ax_main.set_xlim([0, 100])
+    ax_main.set_ylim([0, 100])
+    ax_main.set_xlabel("% of cell cycle")
+    ax_main.set_ylabel("% distance from new pole")
+
     for bin_num, normalised in bins.items():
         colours = cmapper(normalised / max_inten)
         i = 0
@@ -218,10 +261,26 @@ def plot_bins(bins, n_len_bins, ax=None):
                 facecolor=colours[i],
                 edgecolor="none"
             )
-            ax.add_patch(r)
+            ax_main.add_patch(r)
             i += 1
-    ax.set_xlim([0, 100])
-    ax.set_ylim([0, 100])
+
+        if bin_num == 0:
+            label = "Birth"
+            colour = "k"
+        elif bin_num == (n_bins - 1):
+            label = "Division"
+            colour = "r"
+        else:
+            colour = None
+        xvals = (np.arange(n_len_bins) / (n_len_bins - 1)) * 100
+        yvals = normalised / max_inten
+        if colour:
+            ax_other.plot(xvals, yvals, alpha=1, label=label, color=colour)
+        else:
+            ax_other.plot(xvals, yvals, alpha=.2, color="k")
+    ax_other.legend()
+    ax_other.set_xlabel("% distance from new pole")
+    ax_other.set_ylabel("Normalised intensity")
 
 
 def process_cell_lines(cell_lines, extra_firsts, extra_lasts, ax=None):
@@ -234,7 +293,7 @@ def process_cell_lines(cell_lines, extra_firsts, extra_lasts, ax=None):
         norm = normalise_bin(cycle_bin, n_len_bins)
         bins_norm[bin_num] = norm
 
-    plot_bins(bins_norm, n_len_bins, ax=ax)
+    plot_bins(bins_norm, n_len_bins, cycle_bins=bins, ax=ax)
     return n_len_bins
 
 
@@ -270,7 +329,4 @@ if __name__ == "__main__":
 
     cell_lines, (firsts, lasts) = filter_cell_lines(cell_lines)
     n_len_bins = process_cell_lines(cell_lines, firsts, lasts)
-    plt.xlabel("% of cell cycle")
-    plt.ylabel("% distance from new pole")
-    sns.despine()
     plt.savefig("C={0},L={1},ParA_distribution.pdf".format(n_bins, n_len_bins))
