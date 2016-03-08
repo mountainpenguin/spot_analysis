@@ -193,6 +193,7 @@ def normalise_bin(cells, n_len_bins):
     normalised = None
     for cell in cells:
         rescaled_vals, rescaled_bins = resample_bins(cell, n_len_bins)
+        rescaled_vals = rescaled_vals / rescaled_vals.max()
         if normalised is None:
             normalised = rescaled_vals
         else:
