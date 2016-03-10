@@ -20,6 +20,21 @@ OLD_POLE = "d_old"
 MID_CELL = "d_mid"
 
 
+def get_growth_rate(cell_line):
+    t = cell_line[0].t
+    l = [
+        c.length[0][0] * PX for c in cell_line
+    ]
+    if len(t) < 2:
+        return 0
+
+    pf = np.polyfit(t, l, 1)
+    growth_rate = pf[0] * 60
+    if growth_rate < 0:
+        growth_rate = 0
+
+    return growth_rate
+
 def get_traces():
     lin_files = sorted(glob.glob("data/cell_lines/lineage*.npy"))
     lineage_nums = []
@@ -36,6 +51,7 @@ def get_traces():
             continue
         T = cell_line[0].T
         paths = shared.get_parB_path(cell_line, T, lineage_num)
+        cell_growth_rate = get_growth_rate(cell_line)
         for path in paths:
             # path.positions: distance from midcell
             spot_trace = path.spots()
@@ -57,13 +73,21 @@ def get_traces():
             )
             data["d_new"] = data.d_mid + (data.cell_length / 2)
             data["d_old"] = data.cell_length - data.d_new
+            path, subdir = os.path.split(os.getcwd())
+            topdir = os.path.basename(path)
+            data._path = os.getcwd()
+            data._top_dir = topdir
+            data._sub_dir = subdir
+            data._lineage_num = lineage_num
+            data._cell_line_id = cell_line[0].id
+            data._growth_rate = cell_growth_rate
             spot_data.append(data)
-
     return spot_data
 
 
 def get_velocities(data, ref):
     velocities = []
+    indexes = ["path", "top_dir", "sub_dir", "lineage_num", "cell_line_id", "velocity", "abs_velocity", "direction", "growth_rate", "rel_velocity", "abs_rel_velocity"]
     processed = 0
     for spot in data:
         # velocity from new_pole
@@ -72,7 +96,32 @@ def get_velocities(data, ref):
             continue
         dataset = spot[ref] * PX
         pf = np.polyfit(timing, dataset, 1)
-        velocities.append(pf[0] * 60)
+        velocity = pf[0] * 60
+        rel_velocity = velocity - spot._growth_rate
+
+        threshold_velocity = 0.15
+
+        if velocity > threshold_velocity:
+            direction = "away"
+        elif velocity < -threshold_velocity:
+            direction = "towards"
+        else:
+            direction = "stationary"
+
+        velocities.append((
+            spot._path,
+            spot._top_dir,
+            spot._sub_dir,
+            spot._lineage_num,
+            spot._cell_line_id,
+            velocity,
+            np.abs(velocity),
+            direction,
+            spot._growth_rate,
+            rel_velocity,
+            np.abs(rel_velocity),
+        ))
+        # velocities.append(pf[0] * 60)
         processed += 1
 
 #        model = pf[0] * timing + pf[1]
@@ -81,36 +130,56 @@ def get_velocities(data, ref):
 #        plt.plot(timing, model, "k--")
 #        plt.show()
 
-    if ref == NEW_POLE:
+    if ref == MID_CELL:
         print("Of which {0} were processed".format(processed))
-    velocities = np.array(velocities)
-    returnable = (
-        velocities,                   # all spots
-        np.abs(velocities),             # absolute velocities
-        velocities[velocities >= 0],  # moving away from new pole
-        velocities[velocities <= 0],  # moving towards new pole
-    )
-    return returnable
+
+    velocities = pd.DataFrame(data=velocities, columns=indexes)
+    return velocities
     # positive = away from new pole
     # negative = towards new pole
 
 
-def _plot(dataset):
-    sns.distplot(dataset, kde=False)
-
-
-def plot_traces(new, old, mid):
-    fig = plt.figure()
-
-    rows = 3
-    cols = 3
-
-    big_ax = fig.add_subplot(111)
+def _bigax(fig, xlabel=None, ylabel=None, title=None, spec=(1, 1, 1)):
+    big_ax = fig.add_subplot(*spec)
     big_ax.spines['top'].set_color('none')
     big_ax.spines['bottom'].set_color('none')
     big_ax.spines['left'].set_color('none')
     big_ax.spines['right'].set_color('none')
     big_ax.tick_params(labelcolor='w', top='off', bottom='off', left='off', right='off')
+
+    if type(xlabel) is str:
+        big_ax.set_xlabel(xlabel)
+    elif type(xlabel) is tuple:
+        big_ax.set_xlabel(xlabel[0], **xlabel[1])
+
+    if type(ylabel) is str:
+        big_ax.set_ylabel(ylabel)
+    elif type(ylabel) is tuple:
+        big_ax.set_ylabel(ylabel[0], **ylabel[1])
+
+    if type(title) is str:
+        big_ax.set_title(title)
+    elif type(title) is tuple:
+        big_ax.set_title(title[0], **title[1])
+
+    return big_ax
+
+
+def _plot(dataset):
+    sns.distplot(dataset, kde=False)
+    plt.xlabel("")
+
+
+def plot_traces(new, old, mid):
+    fig = plt.figure()
+    _bigax(
+        fig,
+        xlabel=("Velocity (um / h)", {"labelpad": 10}),
+        ylabel=("Frequency", {"labelpad": 25}),
+    )
+
+    rows = 3
+    cols = 3
 
     data = [new, old, mid]
     labels_x = ["All", "Towards", "Away"]
@@ -119,7 +188,7 @@ def plot_traces(new, old, mid):
     ax = None
 
     for row_num in range(3):
-        v_all, v_abs, v_to, v_away = data[row_num]
+        vdata = data[row_num]
         for col_num in range(3):
             if ax:
                 ax = fig.add_subplot(rows, cols, i, sharey=ax)
@@ -134,22 +203,57 @@ def plot_traces(new, old, mid):
                 ax.set_title(labels_x[col_num])
 
             if col_num == 0:
-                _plot(v_all)
-                # _plot(v_abs)
+                # _plot(vdata.rel_velocity)
+                _plot(vdata.velocity)
                 ax.set_ylabel(labels_y[row_num])
                 ax.set_xlim([-2, 2])
                 ax.set_xticks([-2, -1, 0, 1, 2])
             elif col_num == 1:
-                _plot(v_to)
+                # _plot(vdata.abs_rel_velocity[vdata.direction == "towards"])
+                _plot(vdata.abs_velocity[vdata.direction == "towards"])
             elif col_num == 2:
-                _plot(-v_away)
+                # _plot(vdata.abs_rel_velocity[vdata.direction == "away"])
+                _plot(vdata.velocity[vdata.direction == "away"])
             i += 1
-
-    big_ax.set_xlabel("Velocity (um / h)", labelpad=10)
-    big_ax.set_ylabel("Frequency", labelpad=25)
 
     plt.tight_layout()
     plt.savefig("velocity.pdf")
+    size = fig.get_size_inches()
+    plt.close()
+
+    # stats
+    fig = plt.figure(figsize=(size[0], size[1] * 3))
+
+    sp_num = 1
+    rows = 3
+    cols = 2
+    row_num = 0
+    datalabel = "mid-cell"
+
+    for row_num, datalabel in zip(range(rows), ["the new pole", "the old pole", "mid-cell"]):
+        _bigax(
+            fig,
+            xlabel=("Direction of movement", {"labelpad": 10}),
+            title=("Relative to {0}".format(datalabel), {"y": 1.04}),
+            spec=(3, 1, row_num + 1),
+        )
+
+        ax = fig.add_subplot(rows, cols, sp_num)
+        sns.barplot(x="direction", y="abs_velocity", data=data[row_num], order=["away", "towards"], ci=95)
+        # sns.barplot(x="direction", y="abs_rel_velocity", data=data[row_num], order=["away", "towards"], ci=95)
+        ax.set_xlabel("")
+        ax.set_ylabel("Velocity (um / h)")
+        sns.despine()
+
+        ax = fig.add_subplot(rows, cols, sp_num + 1)
+        sns.countplot(x="direction", data=data[row_num], order=["away", "towards", "stationary"])
+        ax.set_xlabel("")
+        ax.set_ylabel("n")
+        sns.despine()
+        sp_num += 2
+
+    plt.tight_layout()
+    plt.savefig("velocity_stats.pdf")
 
 
 if __name__ == "__main__":
