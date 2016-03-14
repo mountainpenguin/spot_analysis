@@ -330,4 +330,10 @@ if __name__ == "__main__":
 
     cell_lines, (firsts, lasts) = filter_cell_lines(cell_lines)
     n_len_bins = process_cell_lines(cell_lines, firsts, lasts)
-    plt.savefig("C={0},L={1},ParA_distribution.pdf".format(n_bins, n_len_bins))
+    if not os.path.exists("ParA_distribution"):
+        os.mkdir("ParA_distribution")
+    fn = os.path.join(
+        "ParA_distribution",
+        "distribution-C{0}-L{1}.pdf".format(n_bins, n_len_bins)
+    )
+    plt.savefig(fn)
