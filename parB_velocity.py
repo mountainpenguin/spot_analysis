@@ -15,11 +15,8 @@ sns.set_context("paper")
 # import scipy.stats
 
 PX = 0.12254
-THRESHOLD = 0.2  # um / hr threshold for movement
-MIN_POINTS = 3
-NEW_POLE = "d_new"
-OLD_POLE = "d_old"
-MID_CELL = "d_mid"
+THRESHOLD = 0.1  # um / hr threshold for movement
+MIN_POINTS = 5
 
 
 def get_growth_rate(cell_line):
@@ -89,14 +86,8 @@ def get_traces():
 
 def get_velocities(data):
     velocities = []
-    indexes = [
-        "path", "top_dir", "sub_dir", "lin", "cid",
-        "v_mid", "v_new", "v_old", "tether",
-        "direction", "growth_rate", "n",
-    ]
     processed = 0
     for spot in data:
-        # velocity from new_pole
         timing = spot.timing
         if len(timing) < MIN_POINTS:
             continue
@@ -105,17 +96,21 @@ def get_velocities(data):
         # if positive: moving away from new pole
         # if negative: moving towards new pole
         vnew = np.polyfit(timing, spot.d_new, 1)[0] * PX * 60
+        # if negative: moving towards new pole
+        # if positive: moving away from new pole
         vold = np.polyfit(timing, spot.d_old, 1)[0] * PX * 60
+        # if negative: moving towards old pole
+        # if positive: moving away from old pole
 
-        plt.figure()
-        plt.plot(timing, spot.cell_length / 2, "k-", lw=2)
-        plt.plot(timing, -spot.cell_length / 2, "k-", lw=2)
-        plt.plot(timing, spot.d_mid, "r-", label="mid {0}".format(vmid))
-        plt.plot(timing, spot.d_new, "g-", label="new {0}".format(vnew))
-        plt.plot(timing, spot.d_old, "b-", label="old {0}".format(vold))
-        plt.legend()
-        plt.show()
-        plt.close()
+#        plt.figure()
+#        plt.plot(timing, spot.cell_length / 2, "k-", lw=2)
+#        plt.plot(timing, -spot.cell_length / 2, "k-", lw=2)
+#        plt.plot(timing, spot.d_mid, "r-", label="mid {0}".format(vmid))
+#        plt.plot(timing, spot.d_new, "g-", label="new {0}".format(vnew))
+#        plt.plot(timing, spot.d_old, "b-", label="old {0}".format(vold))
+#        plt.legend()
+#        plt.show()
+#        plt.close()
 
         direction = "stationary"
         if spot.d_mid[spot.index[-1]] < 0:
@@ -125,15 +120,16 @@ def get_velocities(data):
                 direction = "away"
             elif vnew < -THRESHOLD:
                 direction = "towards"
+            vabs = np.abs(vnew)
         elif spot.d_mid[spot.index[-1]] > 0:
             tether = "old"
-            print(vold)
             if vold > THRESHOLD:
-                direction = "towards"
-            elif vold < -THRESHOLD:
                 direction = "away"
+            elif vold < -THRESHOLD:
+                direction = "towards"
+            vabs = np.abs(vold)
         else:
-            tether = "stationary"
+            tether = None
 
 #        print("Spot tethered to:", tether)
 #        print(spot[["timing", "d_mid"]])
@@ -150,15 +146,16 @@ def get_velocities(data):
             spot._path,             # path
             spot._top_dir,          # top_dir
             spot._sub_dir,          # sub_dir
-            spot._lineage_num,      # lineage_num
-            spot._cell_line_id,     # cell_line_id
-            vmid,                   # velocity_mid
-            vnew,                   # velocity_new
-            vold,                   # velocity_old
+            spot._lineage_num,      # lin
+            spot._cell_line_id,     # cid
+            vmid,                   # v_mid
+            vnew,                   # v_new
+            vold,                   # v_old
             tether,                 # tether
             direction,              # direction
             spot._growth_rate,      # growth_rate
             len(timing),            # n
+            np.abs(vabs),           # v_abs
         )
         velocities.append(appendable)
         processed += 1
@@ -171,6 +168,12 @@ def get_velocities(data):
 
     print("Of which {0} were processed".format(processed))
 
+    indexes = [
+        "path", "top_dir", "sub_dir", "lin", "cid",
+        "v_mid", "v_new", "v_old", "tether",
+        "direction", "growth_rate", "n",
+        "v_abs"
+    ]
     velocities = pd.DataFrame(data=velocities, columns=indexes)
 #    print(velocities[["lin", "v_mid", "v_new", "v_old", "tether", "direction", "growth_rate", "n"]])
     return velocities
@@ -204,9 +207,20 @@ def _bigax(fig, xlabel=None, ylabel=None, title=None, spec=(1, 1, 1)):
     return big_ax
 
 
-def _plot(dataset):
-    sns.distplot(dataset, kde=False)
+def _plot(dataset, **kwargs):
+    sns.distplot(dataset, kde=False, **kwargs)
+    ax = plt.gca()
+    p0 = None
+    pn = None
+    for p in ax.patches:
+        if -THRESHOLD < p.get_x() < THRESHOLD:
+            p.set_color("r")
+            p0 = p
+        else:
+            pn = p
+
     plt.xlabel("")
+    return p0, pn
 
 
 def plot_traces(vdata):
@@ -221,47 +235,72 @@ def plot_traces(vdata):
     cols = 3
 
     data = [vdata[vdata.tether == "new"], vdata[vdata.tether == "old"]]
+    dataselect = ["v_new", "v_old"]
     labels_x = ["All", "Towards", "Away"]
     labels_y = ["New Pole", "Old Pole"]
     i = 1
-    ax = None
+    ax_c0 = None
+    ax_cn = None
 
     for row_num in range(rows):
         dataset = data[row_num]
-        print(dataset)
         for col_num in range(cols):
-            if ax:
-                ax = fig.add_subplot(rows, cols, i, sharey=ax)
+            if col_num == 0 and ax_c0:
+                ax = fig.add_subplot(rows, cols, i, sharex=ax_c0, sharey=ax_c0)
+            elif col_num > 0 and ax_cn:
+                ax = fig.add_subplot(rows, cols, i, sharex=ax_cn, sharey=ax_cn)
             else:
                 ax = fig.add_subplot(rows, cols, i)
             sns.despine()
-            # lim = np.ceil(v_abs.max())
-            # ax.set_xlim([0, 2])
-            # ax.set_ylim([0, 100])
-            # ax.set_xticks([0, 0.5, 1, 1.5, 2])
             if row_num == 0:
                 ax.set_title(labels_x[col_num])
 
+            d = dataset[dataselect[row_num]]  # e.g. dataset.v_new
             if col_num == 0:
-                _plot(dataset.v_new)
+                p0, pn = _plot(d)
+                if p0:
+                    p0.set_label("n = {0}".format(
+                        len(d[dataset.direction == "stationary"])
+                    ))
+                pn.set_label("n = {0}".format(
+                    len(d) - len(d[dataset.direction == "stationary"])
+                ))
                 ax.set_ylabel(labels_y[row_num])
-                ax.set_xlim([-2, 2])
-                ax.set_xticks([-2, -1, 0, 1, 2])
             elif col_num == 1:
-                # _plot(vdata.abs_rel_velocity[vdata.direction == "towards"])
-                _plot(dataset.v_new[dataset.direction == "towards"])
+                d2 = -d[dataset.direction == "towards"]
+                _, pn = _plot(d2)
+                pn.set_label("n = {0}".format(len(d2)))
+
             elif col_num == 2:
                 # _plot(vdata.abs_rel_velocity[vdata.direction == "away"])
-                _plot(dataset.v_new[dataset.direction == "away"])
+                d2 = d[dataset.direction == "away"]
+                _, pn = _plot(d2)
+                pn.set_label("n = {0}".format(len(d2)))
+            plt.legend()
+            if col_num == 0:
+                ax_c0 = ax
+            else:
+                ax_cn = ax
             i += 1
 
+    ax_c0.set_xlim([-2.0, 2.0])
+    ax_c0.set_xticks([-2.0, -1.0, 0.0, 1.0, 2.0])
+
+    ax_cn.set_xlim([0.0, 2.0])
+    ax_cn.set_xticks([0.0, 0.5, 1.0, 1.5, 2.0])
+
     plt.tight_layout()
-    plt.savefig("velocity.pdf")
+    if not os.path.exists("ParB_velocity"):
+        os.mkdir("ParB_velocity")
+    fn = os.path.join(
+        "ParB_velocity",
+        "velocity-T{0}-N{1}.pdf".format(THRESHOLD, MIN_POINTS)
+    )
+    plt.savefig(fn)
     size = fig.get_size_inches()
     plt.close()
 
-    # stats
-#    fig = plt.figure(figsize=(size[0], size[1] * 3))
+    # stats plot
     fig = plt.figure()
 
     sp_num = 1
@@ -270,31 +309,45 @@ def plot_traces(vdata):
     row_num = 0
     datalabel = "mid-cell"
 
-#    for row_num, datalabel in zip(range(rows), ["the new pole", "the old pole", "mid-cell"]):
     _bigax(
         fig,
-        xlabel=("Direction of movement", {"labelpad": 10}),
-        title=("Relative to {0}".format(datalabel), {"y": 1.04}),
+        xlabel=("Nearest Pole", {"labelpad": 10}),
         spec=(rows, 1, row_num + 1),
     )
 
     ax = fig.add_subplot(rows, cols, sp_num)
-#    sns.barplot(x="direction", y="abs_velocity", data=data[row_num], order=["away", "towards"], ci=95)
-    sns.barplot(x="direction", y="abs_rel_velocity", data=data[2], order=["away", "towards"], ci=95)
+    sns.barplot(
+        x="tether",
+        y="v_abs",
+        data=vdata[vdata.tether != None],
+        hue="direction",
+        order=["new", "old"],
+        hue_order=["towards", "away", "stationary"],
+        ci=95
+    )
     ax.set_xlabel("")
     ax.set_ylabel("Velocity (um / h)")
     sns.despine()
 
     ax = fig.add_subplot(rows, cols, sp_num + 1)
-#    sns.countplot(x="direction", data=data[row_num], order=["away", "towards", "stationary"])
-    sns.countplot(x="direction", data=data[2], order=["away", "towards", "stationary"])
+    sns.countplot(
+        x="tether",
+        data=vdata,
+        hue="direction",
+        order=["new", "old"],
+        hue_order=["towards", "away", "stationary"],
+    )
     ax.set_xlabel("")
-    ax.set_ylabel("n")
+    ax.set_ylabel("Number of Spots")
     sns.despine()
-#        sp_num += 2
 
     plt.tight_layout()
-    plt.savefig("velocity_stats.pdf")
+    fn = os.path.join(
+        "ParB_velocity",
+        "velocity-stats-T{0}-N{1}.pdf".format(THRESHOLD, MIN_POINTS)
+    )
+    plt.savefig(fn)
+    plt.close()
 
 
 if __name__ == "__main__":
