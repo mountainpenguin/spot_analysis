@@ -173,11 +173,55 @@ def get_velocities(data):
         velocities.append(appendable)
         processed += 1
 
-#        model = pf[0] * timing + pf[1]
-#        plt.figure()
-#        plt.plot(timing, dataset)
-#        plt.plot(timing, model, "k--")
-#        plt.show()
+#        old_ax = plt.gca()
+#        figsize = np.array(plt.gcf().get_size_inches())
+#        figsize[0] = figsize[0] * 2
+#        fig = plt.figure(figsize=figsize)
+#        _bigax(
+#            fig, spec=(1, 1, 1),
+#            title=("Designation: nearest pole is {0}, movement is {1}".format(
+#                tether, direction
+#            ), {"y": 1.08}),
+#        )
+#        ax = fig.add_subplot(131)
+#        plt.title("Relative to mid-cell")
+#        plt.xlabel("Time")
+#        plt.ylabel("Distance")
+#        model = np.polyfit(timing, spot.d_mid, 1)
+#        l, = plt.plot(timing, PX * (model[0] * timing + model[1]), "k--")
+#        plt.plot(timing, PX * spot.d_mid)
+#        plt.plot(timing, PX * spot.cell_length / 2, "k-", lw=2)
+#        plt.plot(timing, -PX * spot.cell_length / 2, "k-", lw=2)
+#        plt.legend([l], ["v={0:.2f} um/hr".format(vmid)])
+#        sns.despine()
+#
+#        ax = fig.add_subplot(132, sharey=ax)
+#        plt.title("Relative to new pole")
+#        plt.xlabel("Time")
+#        plt.ylabel("Distance")
+#        model = np.polyfit(timing, spot.d_new, 1)
+#        l, = plt.plot(timing, PX * (model[0] * timing + model[1]), "k--")
+#        plt.plot(timing, PX * spot.d_new)
+#        plt.legend([l], ["v={0:.2f} um/hr".format(vnew)])
+#        sns.despine()
+#
+#        fig.add_subplot(133, sharey=ax)
+#        plt.title("Relative to old pole")
+#        plt.xlabel("Time")
+#        plt.ylabel("Distance")
+#        model = np.polyfit(timing, spot.d_old, 1)
+#        l, = plt.plot(timing, PX * (model[0] * timing + model[1]), "k--")
+#        plt.plot(timing, PX * spot.d_old)
+#        plt.legend([l], ["v={0:.2f} um/hr".format(vold)])
+#        sns.despine()
+#
+#        fn = os.path.join("ParB_velocity", "debug", "{0}.pdf".format(spot._hash))
+#        if not os.path.exists("ParB_velocity/debug"):
+#            os.makedirs("ParB_velocity/debug")
+#        plt.tight_layout()
+#        plt.savefig(fn)
+#        plt.close()
+#        plt.sca(old_ax)
 
     print("Of which {0} were processed".format(processed))
 
