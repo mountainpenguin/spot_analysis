@@ -17,7 +17,7 @@ import hashlib
 
 
 PX = 0.12254
-THRESHOLD = 0.1  # um / hr threshold for movement
+THRESHOLD = 0  # um / hr threshold for movement
 MIN_POINTS = 5
 
 
@@ -221,6 +221,7 @@ def _bigax(fig, xlabel=None, ylabel=None, title=None, spec=(1, 1, 1)):
 
 def _plot(dataset, **kwargs):
     sns.distplot(dataset, kde=False, **kwargs)
+    plt.axvline(lw=0.5, color="k", ls="--", alpha=0.85)
     ax = plt.gca()
     p0 = None
     pn = None
@@ -269,6 +270,7 @@ def plot_traces(vdata):
 
             d = dataset[dataselect[row_num]]  # e.g. dataset.v_new
             if col_num == 0:
+                # plot relative to new pole
                 p0, pn = _plot(d)
                 if p0:
                     p0.set_label("n = {0}".format(
@@ -328,13 +330,17 @@ def plot_stats(vdata):
     )
 
     ax = fig.add_subplot(rows, cols, sp_num)
+    if THRESHOLD == 0:
+        hue_order = ["towards", "away"]
+    else:
+        hue_order = ["towards", "away", "stationary"]
     sns.barplot(
         x="tether",
         y="v_abs",
         data=vdata[vdata.tether != None],
         hue="direction",
         order=["new", "old"],
-        hue_order=["towards", "away", "stationary"],
+        hue_order=hue_order,
         ci=95
     )
     ax.set_xlabel("")
@@ -347,7 +353,7 @@ def plot_stats(vdata):
         data=vdata,
         hue="direction",
         order=["new", "old"],
-        hue_order=["towards", "away", "stationary"],
+        hue_order=hue_order,
     )
     ax.set_xlabel("")
     ax.set_ylabel("Number of Spots")
