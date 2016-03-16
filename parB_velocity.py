@@ -13,6 +13,8 @@ import seaborn as sns
 sns.set_style("white")
 sns.set_context("paper")
 # import scipy.stats
+import hashlib
+
 
 PX = 0.12254
 THRESHOLD = 0.1  # um / hr threshold for movement
@@ -34,6 +36,7 @@ def get_growth_rate(cell_line):
 
     return growth_rate
 
+
 def get_traces():
     lin_files = sorted(glob.glob("data/cell_lines/lineage*.npy"))
     lineage_nums = []
@@ -51,6 +54,7 @@ def get_traces():
         T = cell_line[0].T
         paths = shared.get_parB_path(cell_line, T, lineage_num)
         cell_growth_rate = get_growth_rate(cell_line)
+        spot_num = 1
         for path in paths:
             # path.positions: distance from midcell
             spot_trace = path.spots()
@@ -78,9 +82,17 @@ def get_traces():
             data._top_dir = topdir
             data._sub_dir = subdir
             data._lineage_num = lineage_num
+            data._spot_num = spot_num
             data._cell_line_id = cell_line[0].id
             data._growth_rate = cell_growth_rate
+            data._hash = hashlib.sha256("{0}-{1}-{2}-{3}".format(
+                topdir,
+                subdir,
+                lineage_num,
+                spot_num,
+            ).encode("utf-8")).hexdigest()
             spot_data.append(data)
+            spot_num += 1
     return spot_data
 
 
@@ -148,14 +160,15 @@ def get_velocities(data):
             spot._sub_dir,          # sub_dir
             spot._lineage_num,      # lin
             spot._cell_line_id,     # cid
+            spot._hash,             # hash
             vmid,                   # v_mid
             vnew,                   # v_new
             vold,                   # v_old
+            np.abs(vabs),           # v_abs
             tether,                 # tether
             direction,              # direction
             spot._growth_rate,      # growth_rate
             len(timing),            # n
-            np.abs(vabs),           # v_abs
         )
         velocities.append(appendable)
         processed += 1
@@ -169,10 +182,9 @@ def get_velocities(data):
     print("Of which {0} were processed".format(processed))
 
     indexes = [
-        "path", "top_dir", "sub_dir", "lin", "cid",
-        "v_mid", "v_new", "v_old", "tether",
-        "direction", "growth_rate", "n",
-        "v_abs"
+        "path", "top_dir", "sub_dir", "lin", "cid", "hash",
+        "v_mid", "v_new", "v_old", "v_abs",
+        "tether", "direction", "growth_rate", "n",
     ]
     velocities = pd.DataFrame(data=velocities, columns=indexes)
 #    print(velocities[["lin", "v_mid", "v_new", "v_old", "tether", "direction", "growth_rate", "n"]])
@@ -297,9 +309,10 @@ def plot_traces(vdata):
         "velocity-T{0}-N{1}.pdf".format(THRESHOLD, MIN_POINTS)
     )
     plt.savefig(fn)
-    size = fig.get_size_inches()
     plt.close()
 
+
+def plot_stats(vdata):
     # stats plot
     fig = plt.figure()
 
@@ -307,7 +320,6 @@ def plot_traces(vdata):
     rows = 1
     cols = 2
     row_num = 0
-    datalabel = "mid-cell"
 
     _bigax(
         fig,
@@ -350,6 +362,90 @@ def plot_traces(vdata):
     plt.close()
 
 
+def plot_examples(data, vdata):
+    datastore = {
+        x._hash: x for x in data
+    }
+
+    num_rows = 4
+    ystretch = 4
+    if THRESHOLD > 0:
+        directions = ["towards", "away", "stationary"]
+        xstretch = 4
+        num_cols = 6
+    else:
+        directions = ["towards", "away"]
+        xstretch = 8 / 3
+        num_cols = 4
+
+    figsize = np.array(plt.gcf().get_size_inches())
+    figsize[0] = figsize[0] * xstretch
+    figsize[1] = figsize[1] * ystretch
+    fig = plt.figure(figsize=figsize)
+    _bigax(fig, title=("New Pole", {"y": 1.08}), spec=(1, 2, 1))
+    _bigax(fig, title=("Old Pole", {"y": 1.08}), spec=(1, 2, 2))
+    _bigax(
+        fig,
+        xlabel=("Timing (min)", {"labelpad": 10}),
+        ylabel=("Distance from mid-cell (um)", {"labelpad": 10}),
+        spec=(1, 1, 1)
+    )
+
+    num_samples = 3
+    sp_num = 1
+    for pole in ["new", "old"]:
+        for direction in directions:
+            population = vdata[
+                vdata.direction == direction
+            ][
+                vdata.tether == pole
+            ]
+            samples = population.sample(num_samples)
+            selected_data = [datastore[x] for x in samples.hash]
+
+            if pole == "new":
+                maxv = vdata.values[population.v_new.abs().idxmax()][5]
+            elif pole == "old":
+                maxv = vdata.values[population.v_old.abs().idxmax()][5]
+            selected_data.append(datastore[maxv])
+
+            sel_num = 0
+            for selected in selected_data:
+                ax = fig.add_subplot(num_rows, num_cols, sp_num + num_cols * sel_num)
+                if sel_num == 0:
+                    ax.set_title(direction, y=1.08)
+
+                # plot d_mid
+                if pole == "new":
+                    vlabel = "v={0:.2f}".format(
+                        vdata[vdata.hash == selected._hash].v_new.iloc[0]
+                    )
+                elif pole == "old":
+                    vlabel = "v={0:.2f}".format(
+                        vdata[vdata.hash == selected._hash].v_old.iloc[0]
+                    )
+
+                artist = ax.plot(
+                    selected.timing,
+                    PX * selected.d_mid,
+                    label=vlabel
+                )
+                ax.plot(selected.timing, PX * selected.cell_length / 2, "k-", lw=2)
+                ax.plot(selected.timing, -PX * selected.cell_length / 2, "k-", lw=2)
+                plt.legend(artist, [artist[0].get_label()])
+                sns.despine()
+                sel_num += 1
+
+            sp_num += 1
+
+    fn = os.path.join(
+        "ParB_velocity",
+        "examples-T{0}-N{1}.pdf".format(THRESHOLD, MIN_POINTS)
+    )
+    plt.savefig(fn)
+    plt.close()
+
+
 if __name__ == "__main__":
     if os.path.exists("mt"):
         # go go go
@@ -378,5 +474,8 @@ if __name__ == "__main__":
         sys.exit(1)
 
     print("Got all data (n={0})".format(len(data)))
+
     vdata = get_velocities(data)
     plot_traces(vdata)
+    plot_stats(vdata)
+    plot_examples(data, vdata)
