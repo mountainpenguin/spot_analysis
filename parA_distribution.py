@@ -334,6 +334,6 @@ if __name__ == "__main__":
         os.mkdir("ParA_distribution")
     fn = os.path.join(
         "ParA_distribution",
-        "distribution-C{0}-L{1}.pdf".format(n_bins, n_len_bins)
+        "ParA_distribution-C{0}-L{1}.pdf".format(n_bins, n_len_bins)
     )
     plt.savefig(fn)

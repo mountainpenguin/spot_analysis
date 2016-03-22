@@ -1,13 +1,10 @@
-- define old/new poles: orient all cell plots with new pole at top?
-- really make sure daughter cell orientations are correct
+* 'speed' of ParB: 'moving' and 'static' spots cf. to elongation rate
+- use exponential single-cell growth rate rather than linear growth rate
+- scale bar on ParA heatmaps
+- arrange cells on heatmaps as a representation of lineage tree rather than having the tree diagram
+- number daughter cells on heatmaps
+- add initial cell on heatmaps (i.e. show cell at time 0 and time -1)
 - units in um rather than pixels
-- fix network in ancestry plots
-- 'speed' of ParB: 'moving' and 'static' spots cf. to elongation rate
-- variation in size at division
-- variation in septum placement 
-    difference in daughter cell size
-- % cells where ParA is not present at the future division place in the frame before division
-    requires some sort of local thresholding?
 - asymmetry in ParA partioning
     diff. in fluor and change in fluorescence of each daughter
 - cell length / age at ParB split point
@@ -18,5 +15,6 @@
 - ParB movement vs diffusion (<(change in x)^2> ~ 2D(change in t)
     plot <(change in x)^2> for all time windows vs time window size?
 - what is ParA doing when minicells are formed?
-- scale heatmap intensities over all ancestries
+- % cells where ParA is not present at the future division place in the frame before division
+    requires some sort of local thresholding?
 - ParA/B model to predict minicell/anuclear cell frequencies

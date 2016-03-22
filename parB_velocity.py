@@ -280,7 +280,7 @@ def _plot(dataset, **kwargs):
     return p0, pn
 
 
-def plot_traces(vdata):
+def plot_traces(vdata, prefix=""):
     fig = plt.figure()
     _bigax(
         fig,
@@ -352,13 +352,13 @@ def plot_traces(vdata):
         os.mkdir("ParB_velocity")
     fn = os.path.join(
         "ParB_velocity",
-        "velocity-T{0}-N{1}.pdf".format(THRESHOLD, MIN_POINTS)
+        "{2}-velocity-T{0}-N{1}.pdf".format(THRESHOLD, MIN_POINTS, prefix)
     )
     plt.savefig(fn)
     plt.close()
 
 
-def plot_stats(vdata):
+def plot_stats(vdata, prefix=""):
     # stats plot
     fig = plt.figure()
 
@@ -406,13 +406,13 @@ def plot_stats(vdata):
     plt.tight_layout()
     fn = os.path.join(
         "ParB_velocity",
-        "velocity-stats-T{0}-N{1}.pdf".format(THRESHOLD, MIN_POINTS)
+        "{2}-velocity-stats-T{0}-N{1}.pdf".format(THRESHOLD, MIN_POINTS, prefix)
     )
     plt.savefig(fn)
     plt.close()
 
 
-def plot_examples(data, vdata):
+def plot_examples(data, vdata, prefix=""):
     datastore = {
         x._hash: x for x in data
     }
@@ -490,7 +490,7 @@ def plot_examples(data, vdata):
 
     fn = os.path.join(
         "ParB_velocity",
-        "examples-T{0}-N{1}.pdf".format(THRESHOLD, MIN_POINTS)
+        "{2}-examples-T{0}-N{1}.pdf".format(THRESHOLD, MIN_POINTS, prefix)
     )
     plt.savefig(fn)
     plt.close()
