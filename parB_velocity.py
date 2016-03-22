@@ -14,6 +14,7 @@ sns.set_style("white")
 sns.set_context("paper")
 # import scipy.stats
 import hashlib
+import progressbar
 
 
 PX = 0.12254
@@ -39,18 +40,14 @@ def get_growth_rate(cell_line):
 
 def get_traces():
     lin_files = sorted(glob.glob("data/cell_lines/lineage*.npy"))
-    lineage_nums = []
-    cell_lines = []
-    for lf in lin_files:
-        cell_line = np.load(lf)
-        lineage_nums.append(int(re.search("lineage(\d+).npy", lf).group(1)))
-        cell_lines.append(cell_line)
-
+    lineage_nums = [int(re.search("lineage(\d+).npy", x).group(1)) for x in lin_files]
     spot_data = []
-    for lineage_num, cell_line in zip(lineage_nums, cell_lines):
-        pole_assignment = cell_line[0].pole_assignment
-        if not pole_assignment:
+    progress = progressbar.ProgressBar()
+    for lineage_num, lf in progress(list(zip(lineage_nums, lin_files))):
+        cell_line = np.load(lf)
+        if not hasattr(cell_line[0], "pole_assignment") or not cell_line[0].pole_assignment:
             continue
+        pole_assignment = cell_line[0].pole_assignment
         T = cell_line[0].T
         paths = shared.get_parB_path(cell_line, T, lineage_num)
         cell_growth_rate = get_growth_rate(cell_line)
@@ -496,10 +493,42 @@ def plot_examples(data, vdata, prefix=""):
     plt.close()
 
 
+def run(data, prefix=""):
+    print("Got all data (n={0})".format(len(data)))
+    if data:
+        vdata = get_velocities(data)
+        plot_traces(vdata, prefix=prefix)
+        plot_stats(vdata, prefix=prefix)
+        plot_examples(data, vdata, prefix=prefix)
+    else:
+        print("No data, skipping")
+
+
 if __name__ == "__main__":
     if os.path.exists("mt"):
         # go go go
         data = get_traces()
+        run(data)
+    elif "-g" in sys.argv:
+        groups = json.loads(open("groupings.json").read())
+        orig_dir = os.getcwd()
+        for prefix, dirs in groups.items():
+            print("* Processing dataset {0}".format(prefix))
+            data = []
+            for TLD in dirs:
+                for subdir in os.listdir(TLD):
+                    target = os.path.join(TLD, subdir)
+                    target_conf = [
+                        os.path.join(target, "mt", "mt.mat"),
+                        os.path.join(target, "data", "cell_lines", "lineage01.npy"),
+                    ]
+                    conf = [os.path.exists(x) for x in target_conf]
+                    if os.path.isdir(target) and sum(conf) == len(conf):
+                        os.chdir(target)
+                        print("  Handling {0}".format(target))
+                        data.extend(get_traces())
+                        os.chdir(orig_dir)
+            run(data, prefix=prefix)
     elif os.path.exists("wanted.json"):
         # get wanted top-level dirs
         TLDs = json.loads(open("wanted.json").read()).keys()
@@ -508,10 +537,10 @@ if __name__ == "__main__":
         for TLD in TLDs:
             for subdir in os.listdir(TLD):
                 target = os.path.join(TLD, subdir)
-                target_mt = os.path.join(TLD, subdir, "mt", "mt.mat")
                 target_conf = [
                     os.path.join(TLD, subdir, "mt", "mt.mat"),
                     os.path.join(TLD, subdir, "data", "cell_lines", "lineage01.npy"),
+                    os.path.join(TLD, subdir, "poles.json"),
                 ]
                 conf = [os.path.exists(x) for x in target_conf]
                 if os.path.isdir(target) and sum(conf) == len(conf):
@@ -519,13 +548,4 @@ if __name__ == "__main__":
                     print("Handling {0}".format(target))
                     data.extend(get_traces())
                     os.chdir(orig_dir)
-    else:
-        print("Nothing to do, exiting")
-        sys.exit(1)
-
-    print("Got all data (n={0})".format(len(data)))
-
-    vdata = get_velocities(data)
-    plot_traces(vdata)
-    plot_stats(vdata)
-    plot_examples(data, vdata)
+        run(data)
