@@ -29,7 +29,7 @@ def get_cell_lines():
     for lf in lin_files:
         cell_line = np.load(lf)
         cell_lines.append(cell_line)
-    print("Got {0} cell lines".format(len(cell_lines)))
+    print("Got {0} cell lines ({1})".format(len(cell_lines), os.getcwd()))
     return cell_lines
 
 
@@ -208,12 +208,32 @@ def plot_bins(bins, n_len_bins, cycle_bins, ax=None):
     max_inten = vals.max()
     if not ax:
         plt.figure()
-        ax_top = plt.subplot2grid((15, 6), (0, 0), colspan=6)
-        sns.despine()
-        ax_main = plt.subplot2grid((15, 6), (1, 0), colspan=6, rowspan=6)
-        sns.despine()
-        ax_other = plt.subplot2grid((15, 6), (9, 0), colspan=6, rowspan=6)
-        sns.despine()
+        ax_top = plt.subplot2grid((30, 14), (0, 0), colspan=12, rowspan=2)
+        ax_top.xaxis.set_visible(False)
+        ax_top.yaxis.set_visible(False)
+        sns.despine(bottom=True, left=True, ax=ax_top)
+
+        ax_main = plt.subplot2grid((30, 14), (2, 0), colspan=12, rowspan=12)
+        ax_main.set_xlim([0, 100])
+        ax_main.set_ylim([0, 100])
+        ax_main.set_xlabel("% of cell cycle")
+        ax_main.set_ylabel("% distance from new pole")
+        sns.despine(ax=ax_main)
+
+        ax_key = plt.subplot2grid((30, 14), (2, 13), colspan=1, rowspan=12)
+        ax_key.xaxis.set_ticks_position("none")
+        ax_key.yaxis.tick_right()
+        ax_key.yaxis.set_ticks_position("none")
+        ax_key.set_xticks([])
+        ax_key.set_ylabel("Intensity Key")
+        plt.sca(ax_key)
+        plt.yticks([0, 128, 255], ["100%", "50%", "0%"])
+
+        ax_other = plt.subplot2grid((30, 14), (18, 0), colspan=12, rowspan=12)
+        ax_other.set_xlabel("% distance from new pole")
+        ax_other.set_ylabel("Normalised intensity (%)")
+
+        sns.despine(ax=ax_other)
 
     data = np.array([
         (
@@ -238,16 +258,6 @@ def plot_bins(bins, n_len_bins, cycle_bins, ax=None):
             ha="center",
             va="bottom"
         )
-
-    ax_top.spines["bottom"].set_color("none")
-    ax_top.spines["left"].set_color("none")
-    ax_top.xaxis.set_visible(False)
-    ax_top.yaxis.set_visible(False)
-
-    ax_main.set_xlim([0, 100])
-    ax_main.set_ylim([0, 100])
-    ax_main.set_xlabel("% of cell cycle")
-    ax_main.set_ylabel("% distance from new pole")
 
     for bin_num, normalised in bins.items():
         colours = cmapper(normalised / max_inten)
@@ -274,14 +284,27 @@ def plot_bins(bins, n_len_bins, cycle_bins, ax=None):
         else:
             colour = None
         xvals = (np.arange(n_len_bins) / (n_len_bins - 1)) * 100
-        yvals = normalised / max_inten
+        yvals = 100 * normalised / max_inten
         if colour:
             ax_other.plot(xvals, yvals, alpha=1, label=label, color=colour)
         else:
-            ax_other.plot(xvals, yvals, alpha=.2, color="k")
-    ax_other.legend()
-    ax_other.set_xlabel("% distance from new pole")
-    ax_other.set_ylabel("Normalised intensity")
+            ax_other.plot(xvals, yvals, color=(bin_num/n_bins, 0, 0), alpha=.6, label=bin_num)
+    ax_other.legend(bbox_to_anchor=(1.3, 1.1))
+
+    # plot colour bar key
+    g = np.array([np.linspace(0, 1, 256)[::-1]]).T
+#    g = np.vstack((g, g)).T
+
+    ax_key.imshow(g, aspect="auto", cmap=cmapper)
+
+    if not os.path.exists("ParA_distribution"):
+        os.mkdir("ParA_distribution")
+
+    fn = os.path.join(
+        "ParA_distribution",
+        "ParA_distribution-C{0}-L{1}.pdf".format(n_bins, n_len_bins)
+    )
+    plt.savefig(fn)
 
 
 def process_cell_lines(cell_lines, extra_firsts, extra_lasts, ax=None):
@@ -295,7 +318,6 @@ def process_cell_lines(cell_lines, extra_firsts, extra_lasts, ax=None):
         bins_norm[bin_num] = norm
 
     plot_bins(bins_norm, n_len_bins, cycle_bins=bins, ax=ax)
-    return n_len_bins
 
 
 if __name__ == "__main__":
@@ -329,11 +351,5 @@ if __name__ == "__main__":
         sys.exit(1)
 
     cell_lines, (firsts, lasts) = filter_cell_lines(cell_lines)
-    n_len_bins = process_cell_lines(cell_lines, firsts, lasts)
-    if not os.path.exists("ParA_distribution"):
-        os.mkdir("ParA_distribution")
-    fn = os.path.join(
-        "ParA_distribution",
-        "ParA_distribution-C{0}-L{1}.pdf".format(n_bins, n_len_bins)
-    )
-    plt.savefig(fn)
+    process_cell_lines(cell_lines, firsts, lasts)
+

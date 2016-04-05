@@ -1,5 +1,4 @@
 * 'speed' of ParB: 'moving' and 'static' spots cf. to elongation rate
-- scale bar on ParA heatmaps
 - arrange cells on heatmaps as a representation of lineage tree rather than having the tree diagram
 - number daughter cells on heatmaps
 - add initial cell on heatmaps (i.e. show cell at time 0 and time -1)
