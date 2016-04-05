@@ -1,5 +1,4 @@
 * 'speed' of ParB: 'moving' and 'static' spots cf. to elongation rate
-- use exponential single-cell growth rate rather than linear growth rate
 - scale bar on ParA heatmaps
 - arrange cells on heatmaps as a representation of lineage tree rather than having the tree diagram
 - number daughter cells on heatmaps
