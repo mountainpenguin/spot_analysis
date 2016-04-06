@@ -1,12 +1,12 @@
+- asymmetry in ParA partioning
+    diff. in fluor and change in fluorescence of each daughter
+- ParA localisation: low inheritors vs high inheritors
 * 'speed' of ParB: 'moving' and 'static' spots cf. to elongation rate
 - arrange cells on heatmaps as a representation of lineage tree rather than having the tree diagram
 - number daughter cells on heatmaps
 - add initial cell on heatmaps (i.e. show cell at time 0 and time -1)
 - units in um rather than pixels
-- asymmetry in ParA partioning
-    diff. in fluor and change in fluorescence of each daughter
 - cell length / age at ParB split point
-- ParA localisation: low inheritors vs high inheritors
 - ParB localisation at division/birth, relative to new pole (septum)
     sum as for ParA
 - ParB movement vs ParA 'local' gradient
