@@ -8,6 +8,8 @@ import skimage.draw
 import seaborn as sns
 sns.set_context("paper")
 sns.set_style("white")
+import os
+# import pandas as pd
 
 
 def get_total_intensity(cell):
@@ -26,18 +28,21 @@ def get_total_intensity(cell):
     x = mask_vertices[:, 0]
     y = mask_vertices[:, 1]
     rows, cols = skimage.draw.polygon(y, x)
+    xlim, ylim = cell.parA_img.shape
+    rows[rows >= xlim] = xlim - 1
+    cols[cols >= ylim] = ylim - 1
     values = cell.parA_img[rows, cols]
     total_intensity = values.sum()
 
     return total_intensity
 
-def main():
+
+def process():
     lin_files = sorted(glob.glob("data/cell_lines/lineage*.npy"))
     lookup = json.loads(open("ancestry.json").read())
     siblings = {}  # (mother_lin, daughter_lin, daughter_lin
     cell_lines = {}
 
-    lin_nums = range(1, len(lin_files) + 1)
     for l in lin_files:
         c = np.load(l)
         mother_lin = lookup[c[0].id]
@@ -45,29 +50,56 @@ def main():
         if c[-1].children:
             siblings[lookup[c[0].id]] = (lookup[c[-1].children[0]], lookup[c[-1].children[1]])
 
-    print(siblings)
-    fig = plt.figure()
-    p1 = fig.add_subplot(131)
-    p2 = fig.add_subplot(132)
-    p3 = fig.add_subplot(133)
-    for current_num in lin_nums:
-        cell_line = cell_lines[current_num]
-        t = cell_line[0].t
-        i = [get_total_intensity(x) for x in cell_line]
-        p1.plot(t, i, lw=2, label=current_num)
-        p1.set_title("Intensity")
+    for parent_num in sorted(siblings.keys()):
+        child1_num, child2_num = siblings[parent_num]
+#        parent = cell_lines[parent_num][-1]
+        child1 = cell_lines[child1_num][0]
+        child2 = cell_lines[child2_num][0]
 
-        i2 = [get_total_intensity(x) / x.length[0][0] for x in cell_line]
-        p2.plot(t, i2, lw=2)
-        p2.set_title("Length (per px)")
+        # make child1 the smaller cell
+        if child1.length < child2.length:
+            child2_num, child1_num = siblings[parent_num]
+            child1 = cell_lines[child1_num][0]
+            child2 = cell_lines[child2_num][0]
 
-        i3 = [get_total_intensity(x) / x.area[0][0] for x in cell_line]
-        p3.plot(t, i3, lw=2)
-        p3.set_title("Area (per px^2)")
+        c1_inten = get_total_intensity(child1)
+        c2_inten = get_total_intensity(child2)
 
-    p1.legend()
+        c_ratio = c1_inten / c2_inten  # ratio of intensity between children
+        l_ratio = (child1.length / child2.length)[0][0]  # ratio of child lengths
+#        a_ratio = (child1.area / child2.area)[0][0]  # ratio of child areas
+#        dl_ratio = c_ratio / l_ratio  # prop. to length
+#        da_ratio = c_ratio / a_ratio  # prop. to area
+
+        plt.plot(l_ratio, c_ratio, marker="o")
+
+
+def main():
+    plt.figure()
+
+    # iterate through all folders
+    original_path = os.getcwd()
+    dirs = filter(lambda x: os.path.isdir(x), os.listdir())
+    data = {}
+    for d in dirs:
+        subdirs = filter(lambda y: os.path.isdir(os.path.join(d, y)), os.listdir(d))
+        for subdir in subdirs:
+            exists = ["mt", "ancestry.json", "lineages.json", "data/cell_lines/lineage01.npy"]
+            if sum([os.path.exists(os.path.join(d, subdir, z)) for z in exists]) == len(exists):
+                os.chdir(os.path.join(d, subdir))
+                print("< {0}".format(os.path.join(d, subdir)))
+                out = process()
+                if out:
+                    data[os.path.join(d, subdir)] = out
+                os.chdir(original_path)
+
+    sns.despine()
+    plt.xlabel("ratio in length")
+    plt.ylabel("ratio in intensity")
+    xlim = plt.xlim()
+    plt.plot(xlim, xlim, "k--")
+    plt.savefig("ParA_inheritance/ratios.pdf")
     plt.show()
-
 
 if __name__ == "__main__":
     main()
