@@ -9,7 +9,15 @@ import seaborn as sns
 sns.set_context("paper")
 sns.set_style("white")
 import os
-# import pandas as pd
+import pandas as pd
+import hashlib
+
+
+DATA_INDEX = [
+    "topdir", "subdir", "parent_id", "child1_id", "child2_id",
+    "parent_lin", "child1_lin", "child2_lin", "child_ratio",
+    "length_ratio", "area_ratio",
+]
 
 
 def get_total_intensity(cell):
@@ -42,6 +50,7 @@ def process():
     lookup = json.loads(open("ancestry.json").read())
     siblings = {}  # (mother_lin, daughter_lin, daughter_lin
     cell_lines = {}
+    data = pd.DataFrame(columns=DATA_INDEX)
 
     for l in lin_files:
         c = np.load(l)
@@ -65,22 +74,45 @@ def process():
         c1_inten = get_total_intensity(child1)
         c2_inten = get_total_intensity(child2)
 
+        if c1_inten == 0:
+            continue
+
         c_ratio = c1_inten / c2_inten  # ratio of intensity between children
         l_ratio = (child1.length / child2.length)[0][0]  # ratio of child lengths
-#        a_ratio = (child1.area / child2.area)[0][0]  # ratio of child areas
-#        dl_ratio = c_ratio / l_ratio  # prop. to length
-#        da_ratio = c_ratio / a_ratio  # prop. to area
+        a_ratio = (child1.area / child2.area)[0][0]  # ratio of child areas
 
-        plt.plot(l_ratio, c_ratio, marker="o")
+        cwd = os.getcwd()
+        twd, subdir = os.path.split(cwd)
+        topdir = os.path.basename(twd)
+        unique_id = hashlib.sha1(
+            "{0} {1} {2}".format( topdir, subdir, parent_num).encode("utf-8")
+        ).hexdigest()
+        temp = [
+            topdir,
+            subdir,
+            cell_lines[parent_num][-1].id,
+            child1.id,
+            child2.id,
+            parent_num,
+            child1_num,
+            child2_num,
+            c_ratio,
+            l_ratio,
+            a_ratio,
+        ]
+        temp_data = pd.Series(
+            data=temp, index=DATA_INDEX, name=unique_id
+        )
+        data = data.append(temp_data)
+    return data
 
 
-def main():
-    plt.figure()
-
+def iterate():
     # iterate through all folders
     original_path = os.getcwd()
     dirs = filter(lambda x: os.path.isdir(x), os.listdir())
-    data = {}
+
+    all_data = pd.DataFrame(columns=DATA_INDEX)
     for d in dirs:
         subdirs = filter(lambda y: os.path.isdir(os.path.join(d, y)), os.listdir(d))
         for subdir in subdirs:
@@ -89,17 +121,56 @@ def main():
                 os.chdir(os.path.join(d, subdir))
                 print("< {0}".format(os.path.join(d, subdir)))
                 out = process()
-                if out:
-                    data[os.path.join(d, subdir)] = out
+                if len(out) > 0:
+                    all_data = all_data.append(out)
                 os.chdir(original_path)
 
+    all_data.to_pickle("ParA_inheritance/data.pandas")
+    return all_data
+
+def main():
+    if os.path.exists("ParA_inheritance/data.pandas"):
+        print("Loading from backup...")
+        all_data = pd.read_pickle("ParA_inheritance/data.pandas")
+    else:
+        all_data = iterate()
+
+    plt.figure()
+    plt.subplot(221)
     sns.despine()
-    plt.xlabel("ratio in length")
-    plt.ylabel("ratio in intensity")
+    sns.regplot(x="area_ratio", y="child_ratio", data=all_data)
+#    plt.plot(all_data.length_ratio, all_data.child_ratio, ls="none", marker=".")
     xlim = plt.xlim()
+    xlim = [1, xlim[1]]
+    plt.xlim(xlim)
     plt.plot(xlim, xlim, "k--")
+
+    plt.subplot(222)
+    sns.despine()
+    sns.regplot(x="length_ratio", y="child_ratio", data=all_data)
+    xlim = plt.xlim()
+    xlim = [1, xlim[1]]
+    plt.xlim(xlim)
+    plt.plot(xlim, xlim, "k--")
+
+    plt.subplot(223)
+    sns.despine()
+    area_rel = all_data.child_ratio / all_data.area_ratio
+    sns.distplot(area_rel)
+    plt.axvline(1, color="k")
+    plt.xlabel("child_ratio / area_ratio")
+    plt.ylabel("Frequency")
+
+    plt.subplot(224)
+    sns.despine()
+    length_rel = all_data.child_ratio / all_data.length_ratio
+    sns.distplot(length_rel)
+    plt.axvline(1, color="k")
+    plt.xlabel("child_ratio / length_ratio")
+    plt.ylabel("Frequency")
+
+    plt.tight_layout()
     plt.savefig("ParA_inheritance/ratios.pdf")
-    plt.show()
 
 if __name__ == "__main__":
     main()
