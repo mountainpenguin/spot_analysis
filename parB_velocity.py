@@ -16,6 +16,14 @@ sns.set_context("paper")
 import hashlib
 import progressbar
 
+from matplotlib import rc
+rc("font", **{"family": "sans-serif", "sans-serif": ["Helvetica"]})
+rc("text", usetex=True)
+plt.rcParams["text.latex.preamble"] = [
+    r"\usepackage{siunitx}",
+    r"\sisetup{detect-all}",
+]
+
 
 PX = 0.12254
 THRESHOLD = 0  # um / hr threshold for movement
@@ -236,11 +244,11 @@ def get_velocities(data):
 
 def _bigax(fig, xlabel=None, ylabel=None, title=None, spec=(1, 1, 1)):
     big_ax = fig.add_subplot(*spec)
-    big_ax.spines['top'].set_color('none')
-    big_ax.spines['bottom'].set_color('none')
-    big_ax.spines['left'].set_color('none')
-    big_ax.spines['right'].set_color('none')
-    big_ax.tick_params(labelcolor='w', top='off', bottom='off', left='off', right='off')
+    big_ax.spines["top"].set_color("none")
+    big_ax.spines["bottom"].set_color("none")
+    big_ax.spines["left"].set_color("none")
+    big_ax.spines["right"].set_color("none")
+    big_ax.tick_params(labelcolor="w", top="off", bottom="off", left="off", right="off")
 
     if type(xlabel) is str:
         big_ax.set_xlabel(xlabel)
@@ -281,7 +289,7 @@ def plot_traces(vdata, prefix=""):
     fig = plt.figure()
     _bigax(
         fig,
-        xlabel=("Velocity (um / h)", {"labelpad": 10}),
+        xlabel=("Velocity (\si{\micro\metre\per\hour})", {"labelpad": 10}),
         ylabel=("Frequency", {"labelpad": 25}),
     )
 
@@ -351,6 +359,7 @@ def plot_traces(vdata, prefix=""):
         "ParB_velocity",
         "{2}-velocity-T{0}-N{1}.pdf".format(THRESHOLD, MIN_POINTS, prefix)
     )
+    print("Saved file to {0}".format(fn))
     plt.savefig(fn)
     plt.close()
 
@@ -375,6 +384,7 @@ def plot_stats(vdata, prefix=""):
         hue_order = ["towards", "away"]
     else:
         hue_order = ["towards", "away", "stationary"]
+
     sns.barplot(
         x="tether",
         y="v_abs",
@@ -384,8 +394,12 @@ def plot_stats(vdata, prefix=""):
         hue_order=hue_order,
         ci=95
     )
+
     ax.set_xlabel("")
-    ax.set_ylabel("Velocity (um / h)")
+    ax.set_ylabel("Velocity (\si{\micro\metre\per\hour})")
+
+    # get mean elongation rate of population
+
     sns.despine()
 
     ax = fig.add_subplot(rows, cols, sp_num + 1)
@@ -405,6 +419,7 @@ def plot_stats(vdata, prefix=""):
         "ParB_velocity",
         "{2}-velocity-stats-T{0}-N{1}.pdf".format(THRESHOLD, MIN_POINTS, prefix)
     )
+    print("Saved file to {0}".format(fn))
     plt.savefig(fn)
     plt.close()
 
@@ -508,7 +523,11 @@ if __name__ == "__main__":
     if os.path.exists("mt"):
         # go go go
         data = get_traces()
-        run(data)
+        try:
+            prefix = sys.argv[1]
+        except IndexError:
+            prefix = ""
+        run(data, prefix=prefix)
     elif "-g" in sys.argv:
         groups = json.loads(open("groupings.json").read())
         orig_dir = os.getcwd()
@@ -548,4 +567,4 @@ if __name__ == "__main__":
                     print("Handling {0}".format(target))
                     data.extend(get_traces())
                     os.chdir(orig_dir)
-        run(data)
+        run(data, prefix="all")
