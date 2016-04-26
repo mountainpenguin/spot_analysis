@@ -504,6 +504,122 @@ def plot_examples(data, vdata, prefix=""):
         "ParB_velocity",
         "{2}-examples-T{0}-N{1}.pdf".format(THRESHOLD, MIN_POINTS, prefix)
     )
+    print("Saved file to {0}".format(fn))
+    plt.savefig(fn)
+    plt.close()
+
+
+def _sub_analyse(x):
+    a = x[(x.v_mid > THRESHOLD)]
+    b = x[(x.v_mid < -THRESHOLD)]
+    c = x[(x.v_mid <= THRESHOLD) & (x.v_mid >= -THRESHOLD)]
+    return(a, b, c)
+
+
+def sub_analysis(vdata, prefix=""):
+    """ Sub-analysis of spots which are moving away from a pole
+    to determine whether they're moving towards, away from, or static
+    relative to mid-cell
+    """
+    new = vdata[(vdata.direction == "away") & (vdata.tether == "new")]
+    # for new pole, towards mid-cell is +ve v_mid
+    new_towards, new_away, new_static = _sub_analyse(new)
+    new_set = pd.DataFrame({
+        "v_mid": np.hstack([
+            new_towards.v_mid.values,
+            -new_away.v_mid.values,
+            np.abs(new_static.v_mid.values),
+        ]),
+        "direction": (["towards"] * len(new_towards) +
+                      ["away"] * len(new_away) +
+                      ["static"] * len(new_static)),
+    })
+
+    fig = plt.figure()
+    _bigax(
+        fig,
+        xlabel=("Direction relative to mid-cell", {"labelpad": 10}),
+        spec=(2, 1, 1),
+    )
+    ax = fig.add_subplot(2, 2, 1)
+    ax.set_title("New Pole")
+    sns.barplot(
+        x="direction",
+        y="v_mid",
+        data=new_set,
+        order=["towards", "away", "static"],
+        ci=95
+    )
+    ax.set_ylabel("Velocity (\si{\micro\metre\per\hour})")
+    ax.set_xlabel("")
+    sns.despine()
+
+    old = vdata[(vdata.direction == "away") & (vdata.tether == "old")]
+    # for old pole, towards mid-cell is -ve v_mid
+    old_away, old_towards, old_static = _sub_analyse(old)
+    old_set = pd.DataFrame({
+        "v_mid": np.hstack([
+            old_away.v_mid.values,
+            -old_towards.v_mid.values,
+            np.abs(old_static.v_mid.values),
+        ]),
+        "direction": (["away"] * len(old_away) +
+                      ["towards"] * len(old_towards) +
+                      ["static"] * len(old_static)),
+    })
+
+    ax = fig.add_subplot(2, 2, 2)
+    ax.set_title("Old Pole")
+    sns.barplot(
+        x="direction",
+        y="v_mid",
+        data=old_set,
+        order=["towards", "away", "static"],
+        ci=95
+    )
+    ax.set_ylabel("Velocity (\si{\micro\metre\per\hour})")
+    ax.set_xlabel("")
+    sns.despine()
+
+#    _bigax(
+#        fig,
+#        xlabel=("Velocity (\si{\micro\metre\per\hour})", {"labelpad": 10}),
+#        title=("Mid-cell", {"y": 1.08}),
+#        spec=(2, 1, 2),
+#    )
+    ax = fig.add_subplot(2, 2, 3)
+#    sns.distplot(new.v_mid, kde=False)
+#    ax.set_title("New Pole", y=1.08)
+#    ax.set_xlabel("")
+#    ax.yaxis.set_visible(False)
+#    ax.spines["left"].set_color("none")
+    sns.countplot(
+        x="direction",
+        data=new_set,
+        order=["towards", "away", "static"],
+    )
+    sns.despine()
+
+    ax = fig.add_subplot(2, 2, 4)
+#    sns.distplot(old.v_mid, kde=False)
+#    ax.set_title("Old Pole", y=1.08)
+#    ax.set_xlabel("")
+#    ax.yaxis.set_visible(False)
+#    ax.spines["left"].set_color("none")
+    sns.countplot(
+        x="direction",
+        data=old_set,
+        order=["towards", "away", "static"],
+    )
+    sns.despine()
+
+    plt.tight_layout()
+
+    fn = os.path.join(
+        "ParB_velocity",
+        "{2}-away-T{0}-N{1}.pdf".format(THRESHOLD, MIN_POINTS, prefix)
+    )
+    print("Saved file to {0}".format(fn))
     plt.savefig(fn)
     plt.close()
 
@@ -515,6 +631,7 @@ def run(data, prefix=""):
         plot_traces(vdata, prefix=prefix)
         plot_stats(vdata, prefix=prefix)
         plot_examples(data, vdata, prefix=prefix)
+        sub_analysis(vdata, prefix=prefix)
     else:
         print("No data, skipping")
 
