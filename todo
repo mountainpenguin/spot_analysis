@@ -1,4 +1,7 @@
 - ParA localisation: low inheritors vs high inheritors
+- improvements for spot_process:
+    hide button (temporarily hide all spots)
+    phase button (switch to phase image with cell outline, toggle button)
 * 'speed' of ParB: 'moving' and 'static' spots cf. to elongation rate
 - arrange cells on heatmaps as a representation of lineage tree rather than having the tree diagram
 - number daughter cells on heatmaps

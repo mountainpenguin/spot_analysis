@@ -309,6 +309,17 @@ class InteractivePlot(object):
         except IndexError:
             self.end()
 
+        self._change_cell()
+
+    def prev(self):
+        if self.current_cell_idx == 0:
+            return
+
+        self.current_cell_idx -= 1
+        self.current_cell = self.cell_line[self.current_cell_idx]
+        self._change_cell()
+
+    def _change_cell(self):
         self.img_plot.clear()
         self.trace_plot.clear()
         self.update_status()
@@ -403,6 +414,8 @@ class InteractivePlot(object):
                 return
             if event.key == "enter":
                 self.next()
+            elif event.key == "backspace":
+                self.prev()
             elif event.key == "escape":
                 if self.TARGET == "B":
                     self.restore_file()
@@ -644,6 +657,7 @@ class InteractivePlotA(InteractivePlot):
     MODE_DEFAULT = [
         ("ESC", "Discard lineage", "escape"),
         ("Enter", "Next cell", "enter"),
+        ("Backspace", "Previous cell", "backspace"),
         ("t", "Replace Mode", "t"),
     ]
 
@@ -672,6 +686,7 @@ class InteractivePlotB(InteractivePlot):
     MODE_DEFAULT = [
         ("ESC", "Discard lineage", "escape"),
         ("Enter", "Next cell", "enter"),
+        ("Backspace", "Previous cell", "backspace"),
         ("a", "Add Mode", "a"),
         ("r", "Remove Mode", "r"),
         ("R", "Remove all", "R"),
