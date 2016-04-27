@@ -11,6 +11,7 @@ sns.set_style("white")
 import os
 import pandas as pd
 import hashlib
+import scipy.stats
 
 
 DATA_INDEX = [
@@ -139,19 +140,26 @@ def main():
     plt.subplot(221)
     sns.despine()
     sns.regplot(x="area_ratio", y="child_ratio", data=all_data)
+    # plot regression line
+    pf = np.polyfit(all_data.area_ratio, all_data.child_ratio, 1)
+    x = np.linspace(all_data.area_ratio.min(), all_data.area_ratio.max(), 50)
+    y = pf[0] * x + pf[1]
+    pearson_r, _ = scipy.stats.pearsonr(all_data.area_ratio, all_data.child_ratio)
+    plt.plot(x, y, color="none", alpha=1, label="m = {0:.5f}".format(pf[0]))
+    plt.plot(x, y, color="none", alpha=1, label="r = {0:.5f}".format(pearson_r))
+    plt.legend(loc=2)
 #    plt.plot(all_data.length_ratio, all_data.child_ratio, ls="none", marker=".")
-    xlim = plt.xlim()
-    xlim = [1, xlim[1]]
-    plt.xlim(xlim)
-    plt.plot(xlim, xlim, "k--")
 
     plt.subplot(222)
     sns.despine()
     sns.regplot(x="length_ratio", y="child_ratio", data=all_data)
-    xlim = plt.xlim()
-    xlim = [1, xlim[1]]
-    plt.xlim(xlim)
-    plt.plot(xlim, xlim, "k--")
+    pf = np.polyfit(all_data.length_ratio, all_data.child_ratio, 1)
+    x = np.linspace(all_data.length_ratio.min(), all_data.length_ratio.max(), 50)
+    y = pf[0] * x + pf[1]
+    pearson_r, _ = scipy.stats.pearsonr(all_data.length_ratio, all_data.child_ratio)
+    plt.plot(x, y, color="none", alpha=1, label="m = {0:.5f}".format(pf[0]))
+    plt.plot(x, y, color="none", alpha=1, label="r = {0:.5f}".format(pearson_r))
+    plt.legend(loc=2)
 
     plt.subplot(223)
     sns.despine()
