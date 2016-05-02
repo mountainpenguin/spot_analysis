@@ -3,6 +3,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.gridspec
 import matplotlib.patches
+import matplotlib.transforms
 import glob
 import numpy as np
 import re
@@ -14,6 +15,9 @@ import os
 
 from analysis_lib import shared
 from lineage_lib import track
+from lineage_lib import poles
+
+PX = 0.12254
 
 
 def _plot_mesh(ax, mesh):
@@ -179,13 +183,19 @@ def decorate_daughters(cell_line, lineage, ax, pad=10):
 
     # plot approximate division site
     children_ids = parent_cell.children
+
     if children_ids:
         # get info for id
         child1 = lineage.frames.cell(children_ids[1])
         child2 = lineage.frames.cell(children_ids[0])
 
-        ldiff = (child1.length[0][0] + child2.length[0][0] -
-                 parent_cell.length[0][0])
+        if labels:
+            child2_num = labels[last_child2.id]
+        else:
+            child2_num = "?"
+
+        ldiff = (child1.length[0][0] * PX + child2.length[0][0] * PX -
+                 parent_cell.length[0][0] * PX)
 
         # determine which pole each child corresponds to
         # for cell1/cell2 assignment
@@ -209,52 +219,53 @@ def decorate_daughters(cell_line, lineage, ax, pad=10):
             child1 = lineage.frames.cell(children_ids[0])
             child2 = lineage.frames.cell(children_ids[1])
 
-        # width should be approx. an 18th of the total xrange
-        if len(cell_line[0].t) == 1:
-            width = 1
-        else:
-            width = (cell_line[0].t[-1] - cell_line[0].t[0]) / 18
-
+        trans = matplotlib.transforms.blended_transform_factory(
+            ax.transAxes, ax.transData
+        )
+        width = 0.05
         shared_params = {
             "width": width,
-            "boxstyle": matplotlib.patches.BoxStyle.Round(
-                pad=0, rounding_size=width / 2
+            "boxstyle": matplotlib.patches.BoxStyle.Round4(
+                pad=0, rounding_size=0.02,
             ),
             "fill": False,
             "edgecolor": "k",
             "linewidth": 2,
+            "transform": trans,
         }
 
-        lowerleft_x = cell_line[0].t[-1] + pad
+        lowerleft_x = 0.93
         # lowest point of last cell - ldiff/2
         # lowest point = -(L[-1] / 2 )
-        lowerleft_y1 = -(parent_cell.length[0][0] / 2) - (ldiff / 2)
+        lowerleft_y1 = -(parent_cell.length[0][0] * PX / 2) - (ldiff / 2)
         cell1 = matplotlib.patches.FancyBboxPatch(
             (lowerleft_x, lowerleft_y1),
-            height=child1.length[0][0],
+            height=child1.length[0][0] * PX,
             **shared_params
         )
         # highest point of child1
         # i.e. lowerleft_y1 + height
-        lowerleft_y2 = lowerleft_y1 + child1.length[0][0]
+        lowerleft_y2 = lowerleft_y1 + child1.length[0][0] * PX
         cell2 = matplotlib.patches.FancyBboxPatch(
             (lowerleft_x, lowerleft_y2),
-            height=child2.length[0][0],
+            height=child2.length[0][0] * PX,
             **shared_params
         )
         ax.add_patch(cell1)
         ax.add_patch(cell2)
 
         ylim = np.max([
-            child1.length[0][0] + child2.length[0][0],
-            parent_cell.length[0][0]
+            child1.length[0][0] * PX + child2.length[0][0] * PX,
+            parent_cell.length[0][0] * PX
         ]) + 2
 
+        # add 10% to xlim
+        xlimadd = (cell_line[0].t[-1] - cell_line[0].t[0]) / 10
         _plot_limits(
             ax,
             (
                 cell_line[0].t[0] - 8,
-                cell_line[0].t[-1] + 2 + pad + width
+                cell_line[0].t[-1] + 2 + pad + width + xlimadd
             ),
             (
                 -(ylim / 2),
@@ -269,14 +280,14 @@ def decorate_daughters(cell_line, lineage, ax, pad=10):
                 max(cell_line[0].t) + 7
             ),
             (
-                -(parent_cell.length / 2) - 1,
-                parent_cell.length / 2 + 1
+                -(parent_cell.length * PX / 2) - 1,
+                parent_cell.length * PX / 2 + 1
             )
         )
 
 
 def plot_graphs_parB_only(cell_line, lineage_num, ax_parB=None, save=True):
-    L = np.array([x.length[0][0] for x in cell_line])
+    L = np.array([x.length[0][0] * PX for x in cell_line])
     T = shared.get_timings()
     t = np.array(T[cell_line[0].frame - 1:cell_line[-1].frame])
 
@@ -352,7 +363,7 @@ def plot_graphs(cell_line, lineage_num, num_plots=5, parA_heatmap=None, save=Tru
     for cell in cell_line:
         spots_ParA.append(cell.ParA)
         traces_ParA.append(cell.parA_fluorescence_smoothed[::-1])
-        L.append(cell.length[0][0])
+        L.append(cell.length[0][0] * PX)
     L = np.array(L)
 
     traces_ParA = np.concatenate(traces_ParA)
@@ -370,7 +381,7 @@ def plot_graphs(cell_line, lineage_num, num_plots=5, parA_heatmap=None, save=Tru
     cmapper = plt.cm.get_cmap("afmhot")
     for cell in cell_line:
         trace = cell.parA_fluorescence_smoothed
-        l = cell.length[0][0]
+        l = cell.length[0][0] * PX
         x0 = t[i] - 8
         y0 = -(l / 2)
         increment = l / len(trace)
@@ -457,12 +468,12 @@ def plot_graphs(cell_line, lineage_num, num_plots=5, parA_heatmap=None, save=Tru
                 if y.spot_ids[-1] == x.split_parent:
                     textra = y.timing[-1:]
                     timings = np.concatenate([textra, s["timing"]])
-                    posextra = y.position[-1:]
-                    positions = np.concatenate([posextra, s["position"]])
+                    posextra = np.array(y.position[-1:])
+                    positions = np.concatenate([posextra * PX, s["position"] * PX])
                     break
         else:
             timings = s["timing"]
-            positions = s["position"]
+            positions = s["position"] * PX
 
         if num_plots >= 2:
             ax_target = parB_midcell

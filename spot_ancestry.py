@@ -15,6 +15,8 @@ from networkx.drawing.nx_agraph import graphviz_layout
 import seaborn as sns
 sns.set_style("white")
 
+PX = 0.12254
+
 
 def getNumByID(cell_id):
     if not os.path.exists("ancestry.json"):
@@ -73,7 +75,7 @@ def plot_lineages(bonly=False):
         while True:
             if current_num:
                 mother_line = np.load("data/cell_lines/lineage{0:02d}.npy".format(current_num))
-                max_len_ = max([x.length[0][0] for x in mother_line])
+                max_len_ = max([x.length[0][0] * PX for x in mother_line])
                 if max_len_ > max_len:
                     max_len = float(max_len_)
                 cell_lines[current_num] = mother_line
@@ -97,8 +99,8 @@ def plot_lineages(bonly=False):
                 labels[mother_line[-1].id] = current_num
 
                 if daughters:
-                    d1 = lineage.frames.cell(daughters[0]).length[0][0]
-                    d2 = lineage.frames.cell(daughters[1]).length[0][0]
+                    d1 = lineage.frames.cell(daughters[0]).length[0][0] * PX
+                    d2 = lineage.frames.cell(daughters[1]).length[0][0] * PX
                     max_len_ = max([max_len_, d1 + d2])
                     if max_len_ > max_len:
                         max_len = float(max_len_)
