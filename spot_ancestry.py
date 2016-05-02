@@ -10,6 +10,14 @@ from lineage_lib import track
 import spot_plot
 import matplotlib.pyplot as plt
 import matplotlib.gridspec
+
+plt.rc("font", family="sans-serif")
+plt.rc("text", usetex=True)
+plt.rcParams["text.latex.preamble"] = [
+    r"\usepackage{siunitx}",
+    r"\sisetup{detect-all}",
+]
+
 import networkx as nx
 from networkx.drawing.nx_agraph import graphviz_layout
 import seaborn as sns
@@ -61,9 +69,9 @@ def plot_lineages(bonly=False):
 #        cell_line_positions = {}
         cell_lines = {}
         cell_parents = {}
-        designations = {
-            lineage_num: "",
-        }
+#        designations = {
+#            lineage_num: "",
+#        }
         current_num = int(lineage_num)
         buff = []
         generations = {}
@@ -83,7 +91,7 @@ def plot_lineages(bonly=False):
                 daughters = mother_line[-1].children
 
                 gen = 0
-                designation = ""
+#                designation = ""
                 _temp_num = int(current_num)
                 while True:
                     if _temp_num not in cell_parents:
@@ -109,8 +117,8 @@ def plot_lineages(bonly=False):
                     d2n = cells[daughters[1]]
                     buff.append(d1n)
                     buff.append(d2n)
-                    designations[d1n] = designations[current_num] + "A"
-                    designations[d2n] = designations[current_num] + "B"
+#                    designations[d1n] = designations[current_num] + "A"
+#                    designations[d2n] = designations[current_num] + "B"
                     cell_parents[d1n] = current_num
                     cell_parents[d2n] = current_num
                     print("{0} => {1}, {2}".format(current_num, d1n, d2n))
@@ -190,8 +198,9 @@ def plot_lineages(bonly=False):
         for cell_line_num in cell_line_nums:
             if not cell_line_num:
                 continue
-            designation = designations[cell_line_num]
-            title = "{0} ({1})".format(designation, cell_line_num)
+#            designation = designations[cell_line_num]
+            # title = "{0} ({1})".format(designation, cell_line_num)
+            title = "Cell {0}".format(cell_line_num)
 
             cell_line = cell_lines[cell_line_num]
             print("Plotting lineage {0}".format(cell_line_num))
@@ -199,11 +208,14 @@ def plot_lineages(bonly=False):
             sp = matplotlib.gridspec.SubplotSpec(gridspec, i)
             ax = fig.add_subplot(sp)
             ax.set_title(title)
+            if cell_line_num == 1:
+                ax.set_ylabel(r"Distance from mid-cell (\si{\micro\metre})")
+                ax.set_xlabel(r"Time (\si{\minute})")
             spot_plot._despine(ax)
             if bonly:
                 spot_plot.plot_graphs_parB_only(cell_line, cell_line_num, ax_parB=ax, save=False)
             else:
-                spot_plot.plot_graphs(cell_line, cell_line_num, parA_heatmap=ax, save=False, num_plots=1)
+                spot_plot.plot_graphs(cell_line, cell_line_num, parA_heatmap=ax, save=False, num_plots=1, labels=labels)
 
             ylim = (max_len + 5) / 2
             ax.set_ylim([-ylim, ylim])

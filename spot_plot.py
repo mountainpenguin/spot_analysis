@@ -178,7 +178,7 @@ def plot_images(cell_line, lineage_num, plot_parA=True):
     plt.close()
 
 
-def decorate_daughters(cell_line, lineage, ax, pad=10):
+def decorate_daughters(cell_line, lineage, ax, pad=10, labels=None):
     parent_cell = cell_line[-1]
 
     # plot approximate division site
@@ -187,7 +187,19 @@ def decorate_daughters(cell_line, lineage, ax, pad=10):
     if children_ids:
         # get info for id
         child1 = lineage.frames.cell(children_ids[1])
+        last_child1 = lineage.frames.cell(children_ids[1])
+        while type(last_child1.children) is str:
+            # iterate to last child id?
+            last_child1 = lineage.frames.cell(last_child1.children)
+
+        if labels:
+            child1_num = labels[last_child1.id]
+        else:
+            child1_num = "?"
         child2 = lineage.frames.cell(children_ids[0])
+        last_child2 = lineage.frames.cell(children_ids[0])
+        while type(last_child2.children) is str:
+            last_child2 = lineage.frames.cell(last_child2.children)
 
         if labels:
             child2_num = labels[last_child2.id]
@@ -218,6 +230,9 @@ def decorate_daughters(cell_line, lineage, ax, pad=10):
         if child1_dist > child2_dist:
             child1 = lineage.frames.cell(children_ids[0])
             child2 = lineage.frames.cell(children_ids[1])
+            _ = str(child1_num)
+            child1_num = str(child2_num)
+            child2_num = str(_)
 
         trans = matplotlib.transforms.blended_transform_factory(
             ax.transAxes, ax.transData
@@ -253,6 +268,27 @@ def decorate_daughters(cell_line, lineage, ax, pad=10):
         )
         ax.add_patch(cell1)
         ax.add_patch(cell2)
+
+        # add text
+        text_params = {
+            "transform": trans,
+            "ha": "center",
+            "va": "center",
+            "fontsize": 10,
+        }
+        ax.text(
+            lowerleft_x + width / 2,
+            lowerleft_y1 + child1.length[0][0] * PX / 2,
+            child1_num,
+            **text_params
+        )
+
+        ax.text(
+            lowerleft_x + width / 2,
+            lowerleft_y2 + child2.length[0][0] * PX / 2,
+            child2_num,
+            **text_params
+        )
 
         ylim = np.max([
             child1.length[0][0] * PX + child2.length[0][0] * PX,
@@ -349,7 +385,7 @@ def plot_graphs_parB_only(cell_line, lineage_num, ax_parB=None, save=True):
         plt.close()
 
 
-def plot_graphs(cell_line, lineage_num, num_plots=5, parA_heatmap=None, save=True):
+def plot_graphs(cell_line, lineage_num, num_plots=5, parA_heatmap=None, save=True, labels=None):
     lineage = track.Lineage()
     if save:
         fig = plt.figure(figsize=(20, 10))
@@ -425,7 +461,7 @@ def plot_graphs(cell_line, lineage_num, num_plots=5, parA_heatmap=None, save=Tru
             lw=2, marker=".", mec="k", ms=10
         )
 
-    decorate_daughters(cell_line, lineage, parA_heatmap)
+    decorate_daughters(cell_line, lineage, parA_heatmap, labels=labels)
     parA_heatmap.patch.set_alpha(0)
 
     if num_plots >= 3:
