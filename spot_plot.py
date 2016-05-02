@@ -443,8 +443,13 @@ def plot_graphs(cell_line, lineage_num, num_plots=5, parA_heatmap=None, save=Tru
         parA_heatmap.set_xlabel(r"Time (min)")
         parA_heatmap.set_title("ParA")
 
-    parA_heatmap.plot(t, L / 2, "k-", lw=2)
-    parA_heatmap.plot(t, -(L / 2), "k-", lw=2)
+    poledict = poles.PoleAssign(lineage.frames).assign_poles()
+    if poledict[cell_line[0].id] is None:
+        parA_heatmap.plot(t, L / 2, "r-", lw=2)
+        parA_heatmap.plot(t, -(L / 2), "r-", lw=2)
+    else:
+        parA_heatmap.plot(t, L / 2, "k-", lw=2)
+        parA_heatmap.plot(t, -(L / 2), "b-", lw=2)
 
     parAs = {}
     i = 0
