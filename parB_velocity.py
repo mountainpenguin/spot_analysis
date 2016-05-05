@@ -320,24 +320,33 @@ def plot_traces(vdata, prefix=""):
             d = dataset[dataselect[row_num]]  # e.g. dataset.v_new
             if col_num == 0:
                 # plot relative to new pole
-                p0, pn = _plot(d)
-                if p0:
-                    p0.set_label("n = {0}".format(
-                        len(d[dataset.direction == "stationary"])
+                if len(d) == 0:
+                    ax.plot([0, 0], [0, 0], "k-", alpha=1, label="n = 0")
+                else:
+                    p0, pn = _plot(d)
+                    if p0:
+                        p0.set_label("n = {0}".format(
+                            len(d[dataset.direction == "stationary"])
+                        ))
+                    pn.set_label("n = {0}".format(
+                        len(d) - len(d[dataset.direction == "stationary"])
                     ))
-                pn.set_label("n = {0}".format(
-                    len(d) - len(d[dataset.direction == "stationary"])
-                ))
                 ax.set_ylabel(labels_y[row_num])
             elif col_num == 1:
                 d2 = -d[dataset.direction == "towards"]
-                _, pn = _plot(d2)
-                pn.set_label("n = {0}".format(len(d2)))
+                if len(d2) == 0:
+                    ax.plot([0, 0], [0, 0], "k-", alpha=1, label="n = 0")
+                else:
+                    _, pn = _plot(d2)
+                    pn.set_label("n = {0}".format(len(d2)))
 
             elif col_num == 2:
                 # _plot(vdata.abs_rel_velocity[vdata.direction == "away"])
                 d2 = d[dataset.direction == "away"]
-                _, pn = _plot(d2)
+                if len(d2) == 0:
+                    ax.plot([0, 0], [0, 0], "k-", alpha=1, label="n = 0")
+                else:
+                    _, pn = _plot(d2)
                 pn.set_label("n = {0}".format(len(d2)))
             plt.legend()
             if col_num == 0:
@@ -462,41 +471,44 @@ def plot_examples(data, vdata, prefix=""):
             ][
                 vdata.tether == pole
             ]
-            samples = population.sample(num_samples)
-            selected_data = [datastore[x] for x in samples.hash]
+            if len(population) > 0:
+                samples = population.sample(num_samples)
+                selected_data = [datastore[x] for x in samples.hash]
 
-            if pole == "new":
-                maxv = vdata.values[population.v_new.abs().idxmax()][5]
-            elif pole == "old":
-                maxv = vdata.values[population.v_old.abs().idxmax()][5]
-            selected_data.append(datastore[maxv])
-
-            sel_num = 0
-            for selected in selected_data:
-                ax = fig.add_subplot(num_rows, num_cols, sp_num + num_cols * sel_num)
-                if sel_num == 0:
-                    ax.set_title(direction, y=1.08)
-
-                # plot d_mid
                 if pole == "new":
-                    vlabel = "v={0:.2f}".format(
-                        vdata[vdata.hash == selected._hash].v_new.iloc[0]
-                    )
+                    maxv = vdata.values[population.v_new.abs().idxmax()][5]
                 elif pole == "old":
-                    vlabel = "v={0:.2f}".format(
-                        vdata[vdata.hash == selected._hash].v_old.iloc[0]
-                    )
+                    maxv = vdata.values[population.v_old.abs().idxmax()][5]
+                selected_data.append(datastore[maxv])
 
-                artist = ax.plot(
-                    selected.timing,
-                    PX * selected.d_mid,
-                    label=vlabel
-                )
-                ax.plot(selected.timing, PX * selected.cell_length / 2, "k-", lw=2)
-                ax.plot(selected.timing, -PX * selected.cell_length / 2, "k-", lw=2)
-                plt.legend(artist, [artist[0].get_label()])
-                sns.despine()
-                sel_num += 1
+                sel_num = 0
+                for selected in selected_data:
+                    ax = fig.add_subplot(num_rows, num_cols, sp_num + num_cols * sel_num)
+                    if sel_num == 0:
+                        ax.set_title(direction, y=1.08)
+
+                    # plot d_mid
+                    if pole == "new":
+                        vlabel = "v={0:.2f} ({1})".format(
+                            vdata[vdata.hash == selected._hash].v_new.iloc[0],
+                            selected._hash[:6],
+                        )
+                    elif pole == "old":
+                        vlabel = "v={0:.2f} ({1})".format(
+                            vdata[vdata.hash == selected._hash].v_old.iloc[0],
+                            selected._hash[:6],
+                        )
+
+                    artist = ax.plot(
+                        selected.timing,
+                        PX * selected.d_mid,
+                        label=vlabel
+                    )
+                    ax.plot(selected.timing, PX * selected.cell_length / 2, "k-", lw=2)
+                    ax.plot(selected.timing, -PX * selected.cell_length / 2, "k-", lw=2)
+                    plt.legend(artist, [artist[0].get_label()])
+                    sns.despine()
+                    sel_num += 1
 
             sp_num += 1
 
