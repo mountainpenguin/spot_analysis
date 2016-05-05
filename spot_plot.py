@@ -382,7 +382,6 @@ def plot_graphs_parB_only(cell_line, lineage_num, ax_parB=None, save=True, label
         ax_parB.plot(t, L / 2, "k-", lw=2, label="Cell poles")
         ax_parB.plot(t, -(L / 2), "b-", lw=2)
 
-
     spots_ParB = shared.get_parB_path(cell_line, T, lineage_num)
     spotnum = 1
     colourwheel = sns.color_palette(n_colors=len(spots_ParB))
