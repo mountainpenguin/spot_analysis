@@ -178,7 +178,7 @@ def plot_images(cell_line, lineage_num, plot_parA=True):
     plt.close()
 
 
-def decorate_daughters(cell_line, lineage, ax, pad=10, labels=None):
+def decorate_daughters(cell_line, lineage, ax, pad=10, labels=None, um=False):
     parent_cell = cell_line[-1]
 
     # plot approximate division site
@@ -206,8 +206,12 @@ def decorate_daughters(cell_line, lineage, ax, pad=10, labels=None):
         else:
             child2_num = "?"
 
-        ldiff = (child1.length[0][0] * PX + child2.length[0][0] * PX -
-                 parent_cell.length[0][0] * PX)
+        if um:
+            ldiff = (child1.length[0][0] * PX + child2.length[0][0] * PX -
+                     parent_cell.length[0][0] * PX)
+        else:
+            ldiff = (child1.length[0][0] + child2.length[0][0] -
+                     parent_cell.length[0][0])
 
         # determine which pole each child corresponds to
         # for cell1/cell2 assignment
@@ -252,18 +256,28 @@ def decorate_daughters(cell_line, lineage, ax, pad=10, labels=None):
         lowerleft_x = 0.93
         # lowest point of last cell - ldiff/2
         # lowest point = -(L[-1] / 2 )
-        lowerleft_y1 = -(parent_cell.length[0][0] * PX / 2) - (ldiff / 2)
+        if um:
+            lowerleft_y1 = -(parent_cell.length[0][0] * PX / 2) - (ldiff / 2)
+            height = child1.length[0][0] * PX
+        else:
+            lowerleft_y1 = -(parent_cell.length[0][0] / 2) - (ldiff / 2)
+            height = child1.length[0][0]
         cell1 = matplotlib.patches.FancyBboxPatch(
             (lowerleft_x, lowerleft_y1),
-            height=child1.length[0][0] * PX,
+            height=height,
             **shared_params
         )
         # highest point of child1
         # i.e. lowerleft_y1 + height
-        lowerleft_y2 = lowerleft_y1 + child1.length[0][0] * PX
+        if um:
+            lowerleft_y2 = lowerleft_y1 + child1.length[0][0] * PX
+            height = child2.length[0][0] * PX
+        else:
+            lowerleft_y2 = lowerleft_y1 + child1.length[0][0]
+            height = child2.length[0][0]
         cell2 = matplotlib.patches.FancyBboxPatch(
             (lowerleft_x, lowerleft_y2),
-            height=child2.length[0][0] * PX,
+            height=height,
             **shared_params
         )
         ax.add_patch(cell1)
@@ -276,24 +290,37 @@ def decorate_daughters(cell_line, lineage, ax, pad=10, labels=None):
             "va": "center",
             "fontsize": 10,
         }
+        text_x = lowerleft_x + width / 2
+        if um:
+            text_y1 = lowerleft_y1 + child1.length[0][0] * PX / 2
+            text_y2 = lowerleft_y2 + child2.length[0][0] * PX / 2
+        else:
+            text_y1 = lowerleft_y1 + child1.length[0][0] / 2
+            text_y2 = lowerleft_y2 + child2.length[0][0] / 2
         ax.text(
-            lowerleft_x + width / 2,
-            lowerleft_y1 + child1.length[0][0] * PX / 2,
+            text_x,
+            text_y1,
             child1_num,
             **text_params
         )
 
         ax.text(
-            lowerleft_x + width / 2,
-            lowerleft_y2 + child2.length[0][0] * PX / 2,
+            text_x,
+            text_y2,
             child2_num,
             **text_params
         )
 
-        ylim = np.max([
-            child1.length[0][0] * PX + child2.length[0][0] * PX,
-            parent_cell.length[0][0] * PX
-        ]) + 2
+        if um:
+            ylim = np.max([
+                child1.length[0][0] * PX + child2.length[0][0] * PX,
+                parent_cell.length[0][0] * PX
+            ]) + 2
+        else:
+            ylim = np.max([
+                child1.length[0][0] + child2.length[0][0],
+                parent_cell.length[0][0]
+            ]) + 2
 
         # add 10% to xlim
         xlimadd = (cell_line[0].t[-1] - cell_line[0].t[0]) / 10
@@ -309,6 +336,13 @@ def decorate_daughters(cell_line, lineage, ax, pad=10, labels=None):
             )
         )
     else:
+        if um:
+            y00 = -(parent_cell.length * PX / 2) - 1
+            y01 = (parent_cell.length * PX / 2) + 1
+        else:
+            y00 = -(parent_cell.length / 2) - 1
+            y01 = parent_cell.length / 2 + 1
+
         _plot_limits(
             ax,
             (
@@ -316,14 +350,17 @@ def decorate_daughters(cell_line, lineage, ax, pad=10, labels=None):
                 max(cell_line[0].t) + 7
             ),
             (
-                -(parent_cell.length * PX / 2) - 1,
-                parent_cell.length * PX / 2 + 1
+                y00,
+                y01
             )
         )
 
 
-def plot_graphs_parB_only(cell_line, lineage_num, ax_parB=None, save=True):
-    L = np.array([x.length[0][0] * PX for x in cell_line])
+def plot_graphs_parB_only(cell_line, lineage_num, ax_parB=None, save=True, labels=None, um=False):
+    if um:
+        L = np.array([x.length[0][0] * PX for x in cell_line])
+    else:
+        L = np.array([x.length[0][0] for x in cell_line])
     T = shared.get_timings()
     t = np.array(T[cell_line[0].frame - 1:cell_line[-1].frame])
 
@@ -337,8 +374,14 @@ def plot_graphs_parB_only(cell_line, lineage_num, ax_parB=None, save=True):
         ax_parB.set_ylabel(r"Distance from mid-cell (px)")
         ax_parB.set_xlabel(r"Time (min)")
 
-    ax_parB.plot(t, L / 2, "k-", lw=2, label="Cell poles")
-    ax_parB.plot(t, -(L / 2), "k-", lw=2)
+    poledict = poles.PoleAssign(lineage.frames).assign_poles()
+    if poledict[cell_line[0].id] is None:
+        ax_parB.plot(t, L / 2, "r-", lw=2, label="Cell poles")
+        ax_parB.plot(t, -(L / 2), "r-", lw=2)
+    else:
+        ax_parB.plot(t, L / 2, "k-", lw=2, label="Cell poles")
+        ax_parB.plot(t, -(L / 2), "b-", lw=2)
+
 
     spots_ParB = shared.get_parB_path(cell_line, T, lineage_num)
     spotnum = 1
@@ -351,12 +394,18 @@ def plot_graphs_parB_only(cell_line, lineage_num, ax_parB=None, save=True):
                 if y.spot_ids[-1] == x.split_parent:
                     textra = y.timing[-1:]
                     timings = np.concatenate([textra, s["timing"]])
-                    posextra = y.position[-1:]
-                    positions = np.concatenate([posextra, s["position"]])
+                    posextra = np.array(y.position[-1:])
+                    if um:
+                        positions = np.concatenate([posextra * PX, s["position"] * PX])
+                    else:
+                        positions = np.concatenate([posextra, s["position"]])
                     break
         else:
             timings = s["timing"]
-            positions = s["position"]
+            if um:
+                positions = s["position"] * PX
+            else:
+                positions = s["position"]
 
         ax_parB.plot(
             timings, positions,
@@ -372,7 +421,7 @@ def plot_graphs_parB_only(cell_line, lineage_num, ax_parB=None, save=True):
         ax_parB.lines.remove(l)
         ax_parB.add_line(l)
 
-    decorate_daughters(cell_line, lineage, ax_parB, pad=5)
+    decorate_daughters(cell_line, lineage, ax_parB, pad=5, labels=labels, um=um)
 
     if save:
         ax_parB.legend(bbox_to_anchor=(1.35, 1))
@@ -385,7 +434,7 @@ def plot_graphs_parB_only(cell_line, lineage_num, ax_parB=None, save=True):
         plt.close()
 
 
-def plot_graphs(cell_line, lineage_num, num_plots=5, parA_heatmap=None, save=True, labels=None):
+def plot_graphs(cell_line, lineage_num, num_plots=5, parA_heatmap=None, save=True, labels=None, um=False):
     lineage = track.Lineage()
     if save:
         fig = plt.figure(figsize=(20, 10))
@@ -399,7 +448,10 @@ def plot_graphs(cell_line, lineage_num, num_plots=5, parA_heatmap=None, save=Tru
     for cell in cell_line:
         spots_ParA.append(cell.ParA)
         traces_ParA.append(cell.parA_fluorescence_smoothed[::-1])
-        L.append(cell.length[0][0] * PX)
+        if um:
+            L.append(cell.length[0][0] * PX)
+        else:
+            L.append(cell.length[0][0])
     L = np.array(L)
 
     traces_ParA = np.concatenate(traces_ParA)
@@ -417,7 +469,10 @@ def plot_graphs(cell_line, lineage_num, num_plots=5, parA_heatmap=None, save=Tru
     cmapper = plt.cm.get_cmap("afmhot")
     for cell in cell_line:
         trace = cell.parA_fluorescence_smoothed
-        l = cell.length[0][0] * PX
+        if um:
+            l = cell.length[0][0] * PX
+        else:
+            l = cell.length[0][0]
         x0 = t[i] - 8
         y0 = -(l / 2)
         increment = l / len(trace)
@@ -466,7 +521,7 @@ def plot_graphs(cell_line, lineage_num, num_plots=5, parA_heatmap=None, save=Tru
             lw=2, marker=".", mec="k", ms=10
         )
 
-    decorate_daughters(cell_line, lineage, parA_heatmap, labels=labels)
+    decorate_daughters(cell_line, lineage, parA_heatmap, labels=labels, um=um)
     parA_heatmap.patch.set_alpha(0)
 
     if num_plots >= 3:
@@ -510,11 +565,17 @@ def plot_graphs(cell_line, lineage_num, num_plots=5, parA_heatmap=None, save=Tru
                     textra = y.timing[-1:]
                     timings = np.concatenate([textra, s["timing"]])
                     posextra = np.array(y.position[-1:])
-                    positions = np.concatenate([posextra * PX, s["position"] * PX])
+                    if um:
+                        positions = np.concatenate([posextra * PX, s["position"] * PX])
+                    else:
+                        positions = np.concatenate([posextra, s["position"]])
                     break
         else:
             timings = s["timing"]
-            positions = s["position"] * PX
+            if um:
+                positions = s["position"] * PX
+            else:
+                positions = s["position"]
 
         if num_plots >= 2:
             ax_target = parB_midcell
@@ -554,7 +615,7 @@ def plot_graphs(cell_line, lineage_num, num_plots=5, parA_heatmap=None, save=Tru
         parB_midcell.set_ylabel(r"Distance from mid-cell (px)")
         parB_midcell.set_xlabel(r"Time (min)")
 
-        decorate_daughters(cell_line, lineage, parB_midcell, pad=5)
+        decorate_daughters(cell_line, lineage, parB_midcell, pad=5, labels=labels, um=um)
 
         parB_midcell.legend(bbox_to_anchor=(1.35, 1))
         parB_midcell.patch.set_alpha(0)

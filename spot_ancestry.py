@@ -213,9 +213,9 @@ def plot_lineages(bonly=False):
                 ax.set_xlabel(r"Time (\si{\minute})")
             spot_plot._despine(ax)
             if bonly:
-                spot_plot.plot_graphs_parB_only(cell_line, cell_line_num, ax_parB=ax, save=False)
+                spot_plot.plot_graphs_parB_only(cell_line, cell_line_num, ax_parB=ax, save=False, labels=labels, um=True)
             else:
-                spot_plot.plot_graphs(cell_line, cell_line_num, parA_heatmap=ax, save=False, num_plots=1, labels=labels)
+                spot_plot.plot_graphs(cell_line, cell_line_num, parA_heatmap=ax, save=False, num_plots=1, labels=labels, um=True)
 
             ylim = (max_len + 5) / 2
             ax.set_ylim([-ylim, ylim])

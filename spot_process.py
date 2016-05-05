@@ -572,7 +572,7 @@ class InteractivePlot(object):
 
         spot_plot.decorate_daughters(
             self.cell_line, self.lineage,
-            self.par_plot, pad=5
+            self.par_plot, pad=5, um=False
         )
         self.par_plot.patch.set_alpha(0)
         self.redraw()
@@ -630,7 +630,7 @@ class InteractivePlot(object):
         if self.GEN_PLOTS:
             print("Saving new PDFs")
             spot_plot.plot_images(self.cell_line, int(self.lineage_num))
-            spot_plot.plot_graphs(self.cell_line, int(self.lineage_num))
+            spot_plot.plot_graphs(self.cell_line, int(self.lineage_num), um=True)
 
         spot_spread.gen_xl(self.cell_line, int(self.lineage_num))
 
