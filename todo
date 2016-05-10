@@ -1,12 +1,10 @@
+* ParB interspot distance
 - ParA localisation: low inheritors vs high inheritors
 - improvements for spot_process:
     hide button (temporarily hide all spots)
     phase button (switch to phase image with cell outline, toggle button)
-* 'speed' of ParB: 'moving' and 'static' spots cf. to elongation rate
 - arrange cells on heatmaps as a representation of lineage tree rather than having the tree diagram
-- number daughter cells on heatmaps
 - add initial cell on heatmaps (i.e. show cell at time 0 and time -1)
-- units in um rather than pixels
 - cell length / age at ParB split point
 - ParB localisation at division/birth, relative to new pole (septum)
     sum as for ParA
