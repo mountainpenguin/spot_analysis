@@ -29,7 +29,6 @@ def _plot_limits(ax, xlim, ylim):
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
 
-
 def _deaxis(ax=None):
     if not ax:
         ax = plt.gca()
@@ -315,7 +314,7 @@ def decorate_daughters(cell_line, lineage, ax, pad=10, labels=None, um=False):
             ylim = np.max([
                 child1.length[0][0] * PX + child2.length[0][0] * PX,
                 parent_cell.length[0][0] * PX
-            ]) + 2
+            ]) + (2 * PX)
         else:
             ylim = np.max([
                 child1.length[0][0] + child2.length[0][0],
@@ -337,8 +336,8 @@ def decorate_daughters(cell_line, lineage, ax, pad=10, labels=None, um=False):
         )
     else:
         if um:
-            y00 = -(parent_cell.length * PX / 2) - 1
-            y01 = (parent_cell.length * PX / 2) + 1
+            y00 = -(parent_cell.length * PX / 2) - PX
+            y01 = (parent_cell.length * PX / 2) + PX
         else:
             y00 = -(parent_cell.length / 2) - 1
             y01 = parent_cell.length / 2 + 1
@@ -380,7 +379,7 @@ def plot_graphs_parB_only(cell_line, lineage_num, ax_parB=None, save=True, label
         ax_parB.plot(t, -(L / 2), "r-", lw=2)
     else:
         ax_parB.plot(t, L / 2, "k-", lw=2, label="Cell poles")
-        ax_parB.plot(t, -(L / 2), "b-", lw=2)
+        ax_parB.plot(t, -(L / 2), "k-", lw=2)
 
     spots_ParB = shared.get_parB_path(cell_line, T, lineage_num)
     spotnum = 1
@@ -503,7 +502,7 @@ def plot_graphs(cell_line, lineage_num, num_plots=5, parA_heatmap=None, save=Tru
         parA_heatmap.plot(t, -(L / 2), "r-", lw=2)
     else:
         parA_heatmap.plot(t, L / 2, "k-", lw=2)
-        parA_heatmap.plot(t, -(L / 2), "b-", lw=2)
+        parA_heatmap.plot(t, -(L / 2), "k-", lw=2)
 
     parAs = {}
     i = 0

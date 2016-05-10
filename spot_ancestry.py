@@ -217,7 +217,7 @@ def plot_lineages(bonly=False):
             else:
                 spot_plot.plot_graphs(cell_line, cell_line_num, parA_heatmap=ax, save=False, num_plots=1, labels=labels, um=True)
 
-            ylim = (max_len + 5) / 2
+            ylim = (max_len + (5 * PX)) / 2
             ax.set_ylim([-ylim, ylim])
 
             already_plotted.append(cell_line_num)
