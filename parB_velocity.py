@@ -53,7 +53,7 @@ def get_traces():
     progress = progressbar.ProgressBar()
     for lineage_num, lf in progress(list(zip(lineage_nums, lin_files))):
         cell_line = np.load(lf)
-        if not hasattr(cell_line[0], "pole_assignment") or not cell_line[0].pole_assignment:
+        if not hasattr(cell_line[0], "pole_assignment") or cell_line[0].pole_assignment is None:
             continue
         pole_assignment = cell_line[0].pole_assignment
         T = cell_line[0].T

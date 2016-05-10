@@ -560,7 +560,7 @@ def main(wanted=True):
         else:
             wantedlineages = None
     else:
-        wantedlineages = range(100)
+        wantedlineages = range(500)
 
     if wantedlineages is None:
         print("No desired lineages in this directory")
