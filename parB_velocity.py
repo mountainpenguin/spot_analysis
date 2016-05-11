@@ -8,6 +8,7 @@ import glob
 import numpy as np
 import re
 import pandas as pd
+from pandas import ExcelWriter
 import matplotlib.pyplot as plt
 import seaborn as sns
 sns.set_style("white")
@@ -30,7 +31,7 @@ THRESHOLD = 0  # um / hr threshold for movement
 MIN_POINTS = 5
 
 
-def get_growth_rate(cell_line):
+def get_elongation_rate(cell_line):
     t = cell_line[0].t
     l = [
         c.length[0][0] * PX for c in cell_line
@@ -39,11 +40,11 @@ def get_growth_rate(cell_line):
         return 0
 
     pf = np.polyfit(t, l, 1)
-    growth_rate = pf[0] * 60
-    if growth_rate < 0:
-        growth_rate = 0
+    elongation_rate = pf[0] * 60
+    if elongation_rate < 0:
+        elongation_rate = 0
 
-    return growth_rate
+    return elongation_rate
 
 
 def get_traces():
@@ -55,10 +56,10 @@ def get_traces():
         cell_line = np.load(lf)
         if not hasattr(cell_line[0], "pole_assignment") or cell_line[0].pole_assignment is None:
             continue
-        pole_assignment = cell_line[0].pole_assignment
+#        pole_assignment = cell_line[0].pole_assignment
         T = cell_line[0].T
         paths = shared.get_parB_path(cell_line, T, lineage_num)
-        cell_growth_rate = get_growth_rate(cell_line)
+        cell_elongation_rate = get_elongation_rate(cell_line)
         spot_num = 1
         for path in paths:
             # path.positions: distance from midcell
@@ -89,7 +90,7 @@ def get_traces():
             data._lineage_num = lineage_num
             data._spot_num = spot_num
             data._cell_line_id = cell_line[0].id
-            data._growth_rate = cell_growth_rate
+            data._elongation_rate = cell_elongation_rate
             data._hash = hashlib.sha256("{0}-{1}-{2}-{3}".format(
                 topdir,
                 subdir,
@@ -155,7 +156,7 @@ def get_velocities(data):
 #            "num": spot._lineage_num,
 #            "v_mid": vmid, "v_new": vnew,
 #            "v_old": vold, "v_ratio": v_ratio,
-#            "growth_rate": spot._growth_rate,
+#            "elongation_rate": spot._elongation_rate,
 #        }))
 #        input("...")
 
@@ -172,7 +173,7 @@ def get_velocities(data):
             np.abs(vabs),           # v_abs
             tether,                 # tether
             direction,              # direction
-            spot._growth_rate,      # growth_rate
+            spot._elongation_rate,  # elongation_rate
             len(timing),            # n
         )
         velocities.append(appendable)
@@ -233,10 +234,10 @@ def get_velocities(data):
     indexes = [
         "path", "top_dir", "sub_dir", "lin", "cid", "hash",
         "v_mid", "v_new", "v_old", "v_abs",
-        "tether", "direction", "growth_rate", "n",
+        "tether", "direction", "elongation_rate", "n",
     ]
     velocities = pd.DataFrame(data=velocities, columns=indexes)
-#    print(velocities[["lin", "v_mid", "v_new", "v_old", "tether", "direction", "growth_rate", "n"]])
+#    print(velocities[["lin", "v_mid", "v_new", "v_old", "tether", "direction", "elongation_rate", "n"]])
     return velocities
     # positive = away from new pole
     # negative = towards new pole
@@ -371,6 +372,131 @@ def plot_traces(vdata, prefix=""):
     print("Saved file to {0}".format(fn))
     plt.savefig(fn)
     plt.close()
+
+
+def _proc(x, tether):
+    data = x[(x.tether == tether)]
+    data_away = data[
+        (x.direction == "away")
+    ]
+    data_away_a, data_away_t, data_away_s = _sub_analyse(data_away)
+    data_towards = data[
+        (x.direction == "towards")
+    ]
+    dta, dtt, dts = _sub_analyse(data_towards)
+    data_static = data[
+        (x.direction == "stationary")
+    ]
+    data_static_a, data_static_t, data_static_s = _sub_analyse(data_static)
+    if tether == "old":
+        temp = data_away_t.copy()
+        data_away_t = data_away_a.copy()
+        data_away_a = temp.copy()
+
+        temp = dtt.copy()
+        dtt = dta.copy()
+        dta = temp.copy()
+
+        temp = data_static_t.copy()
+        data_static_t = data_static_a.copy()
+        data_static_a = temp.copy()
+
+    data_xl = [
+        (  # row 1
+            "", "", "", "",
+            "Away mid-cell",
+            "Towards mid-cell",
+            "Static mid-cell",
+        ), (  # row 2
+            "{0} Pole".format(tether.title()),
+            len(data),
+            "Away",
+            len(data_away),
+            len(data_away_t),
+            len(data_away_a),
+            len(data_away_s),
+        ), (  # row 3
+            "", "",
+            "Towards",
+            len(data_towards),
+            len(dtt),
+            len(dta),
+            len(dts)
+        ), (  # row 4
+            "", "",
+            "Static",
+            len(data_static),
+            len(data_static_t),
+            len(data_static_a),
+            len(data_static_s),
+        )
+    ]
+    return data_xl
+
+
+def save_stats(vdata, prefix=""):
+    writer = ExcelWriter(
+        "ParB_velocity/{0}.xlsx".format(prefix or "default"),
+        engine="openpyxl"
+    )
+    new_xl = _proc(vdata, "new")
+    old_xl = _proc(vdata, "old")
+    vdata.to_excel(
+        writer, "Raw data"
+    )
+
+    wb = writer.book
+    ws = wb.create_sheet("Stats")
+    ws.page_setup.fitToWidth = 1
+
+    row = 1
+    summer = lambda x, y: ws.cell(row=x - 4, column=y).value + ws.cell(row=x - 8, column=y).value
+    perc = lambda x, y: ws.cell(row=x - 13, column=y).value / ws.cell(row=10, column=2).value
+    repl = lambda x, y: ws.cell(row=x - 13, column=y).value
+    total_xl = [
+        *new_xl,
+        (),
+        *old_xl[1:],
+        (),
+        ("Total", summer, "Away", summer, summer, summer, summer),
+        ("", "", "Towards", summer, summer, summer, summer),
+        ("", "", "Static", summer, summer, summer, summer),
+        (),
+        ("Percentage",),
+        (repl, perc, repl, perc, perc, perc, perc),
+        ("", "", repl, perc, perc, perc, perc),
+        ("", "", repl, perc, perc, perc, perc),
+        (),
+        (repl, perc, repl, perc, perc, perc, perc),
+        ("", "", repl, perc, perc, perc, perc),
+        ("", "", repl, perc, perc, perc, perc),
+        (),
+        (repl, perc, repl, perc, perc, perc, perc),
+        ("", "", repl, perc, perc, perc, perc),
+        ("", "", repl, perc, perc, perc, perc),
+    ]
+
+    for r in total_xl:
+        col = 1
+        for c in r:
+            if callable(c):
+                x = ws.cell(row=row, column=col)
+                x.value = c(row, col)
+                if c == perc:
+                    x.number_format = "0.00%"
+            elif c != "":
+                ws.cell(row=row, column=col).value = c
+            col += 1
+        row += 1
+
+    ws.column_dimensions["A"].width = 15
+    ws.column_dimensions["B"].width = 11
+    ws.column_dimensions["C"].width = 15
+    ws.column_dimensions["E"].width = 20
+    ws.column_dimensions["F"].width = 20
+    ws.column_dimensions["G"].width = 20
+
+    writer.save()
 
 
 def plot_stats(vdata, prefix=""):
