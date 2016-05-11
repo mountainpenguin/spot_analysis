@@ -33,17 +33,19 @@ def get_growth_rate(delta):
     L = np.log(l)
     return np.polyfit(t, L, 1)[0]
 
+
 def get_elong_rate(delta):
     return np.polyfit(delta.timing / 60, delta.cell_length * PX, 1)[0]
+
 
 def get_velocity(delta):
     v, _, _, p, _ = scipy.stats.linregress(delta.timing / 60, delta.interspot * PX)
     if p < 0.05:
         return v
 
+
 def get_delta(one, two):
     spot1 = one.spots()
-    spot2 = two.spots()
     timing_range = range(
         spot1["timing"].min(),
         spot1["timing"].max() + 15,
@@ -89,6 +91,7 @@ def get_delta(one, two):
 
     return delta
 
+
 def add_parent(p, x):
     s = p.spots()
     x.timing = [s["timing"][-1]] + x.timing
@@ -96,6 +99,7 @@ def add_parent(p, x):
     x.intensity = [s["intensity"][-1]] + x.intensity
     x.length = [p.length[-1]] + x.length
     x.spot_ids = [p.spot_ids[-1]] + x.spot_ids
+
 
 def process():
     lin_files = sorted(glob.glob("data/cell_lines/lineage*.npy"))
@@ -160,7 +164,7 @@ def plot(data):
         "WT ParAB int", "WT ParB int",
         "WT episomal ParB",
     ]
-    fig = plt.figure(figsize=(8, 8))
+    plt.figure(figsize=(8, 8))
 
     ax = plt.subplot(221)
     sns.barplot(
@@ -193,7 +197,6 @@ def plot(data):
         order=plot_order
     )
     _fmt_barplot(ax, "n")
-
 
     plt.tight_layout()
     plt.savefig("parB_interspot/parB_interspot.pdf")
