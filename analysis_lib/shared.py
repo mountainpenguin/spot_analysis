@@ -258,3 +258,23 @@ def _timediff(day, time, t0):
     s += td.seconds
     m = s // 60
     return m
+
+
+def get_growth_rate(lin, PX=0.12254):
+    """ Exponential method of determining growth rate """
+    if len(lin) < 3:
+        return None
+    timings = (lin[0].t - lin[0].t[0]) / 60
+    lengths = [x.length[0][0] * PX for x in lin]
+
+    logLength = np.log(lengths)
+    return np.polyfit(timings, logLength, 1)[0]
+
+
+def get_elongation_rate(lin, PX=0.12254):
+    """ Linear method of determining growth rate """
+    if len(lin) < 3:
+        return None
+    timings = lin[0].t / 60
+    lengths = [x.length[0][0] * PX for x in lin]
+    return np.polyfit(timings, lengths, 1)[0]
