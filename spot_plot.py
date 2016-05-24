@@ -30,6 +30,7 @@ def _plot_limits(ax, xlim, ylim):
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
 
+
 def _deaxis(ax=None):
     if not ax:
         ax = plt.gca()
@@ -237,7 +238,7 @@ def decorate_daughters(cell_line, lineage, ax, pad=10, labels=None, um=False):
     ax.text(
         0.045, 0,
         parent_label,
-        **text_params,
+        **text_params
     )
 
     # plot approximate division site

@@ -53,6 +53,7 @@ def reconfigure_data(data, x, y):
     re_data = pd.DataFrame(indata)
     return re_data
 
+
 def reconfigure_all_data(data, x):
     swaps = [
         ("child1_id", "child2_id"),
@@ -86,7 +87,6 @@ def reconfigure_all_data(data, x):
 
     re_data = pd.DataFrame(out_data)
     return re_data
-
 
 
 def swarm(ax, data, xlabel1, xlabel2, ylabel):
@@ -240,6 +240,7 @@ def get_parB_split(lin, lin_num):
         return None
     else:
         return np.min(split_times)
+
 
 def get_maximal(cell):
     pass
