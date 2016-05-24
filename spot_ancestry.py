@@ -18,8 +18,6 @@ plt.rcParams["text.latex.preamble"] = [
     r"\sisetup{detect-all}",
 ]
 
-import networkx as nx
-from networkx.drawing.nx_agraph import graphviz_layout
 import seaborn as sns
 sns.set_style("white")
 
@@ -77,7 +75,6 @@ def plot_lineages(bonly=False):
         generations = {}
         max_len = 0
 
-        graph = nx.DiGraph()
         labels = {}
 
         while True:
@@ -100,10 +97,6 @@ def plot_lineages(bonly=False):
                     gen += 1
                 generations[current_num] = gen
 
-                if mother_line[0].parent:
-                    graph.add_edge(mother_line[0].parent, mother_line[-1].id)
-                else:
-                    graph.add_node(mother_line[-1].id)
                 labels[mother_line[-1].id] = current_num
 
                 if daughters:
@@ -181,8 +174,8 @@ def plot_lineages(bonly=False):
 #            i += 1
 #
 
-        num_rows = int(round(np.sqrt(len(cell_lines) + 1)))
-        if num_rows ** 2 < len(cell_lines) + 1:
+        num_rows = int(round(np.sqrt(len(cell_lines))))
+        if num_rows ** 2 < len(cell_lines):
             gridspec = matplotlib.gridspec.GridSpec(num_rows + 1, num_rows)
         else:
             gridspec = matplotlib.gridspec.GridSpec(num_rows, num_rows)
@@ -222,23 +215,6 @@ def plot_lineages(bonly=False):
 
             already_plotted.append(cell_line_num)
             i += 1
-
-        # add network plot
-        sp = matplotlib.gridspec.SubplotSpec(gridspec, i)
-        ax = fig.add_subplot(sp)
-        ax.set_title("Tree")
-        spot_plot._despine(ax)
-        pos = graphviz_layout(graph, prog="dot")
-        nx.draw_networkx_labels(
-            graph, pos, labels=labels,
-            font_size=10,
-            font_weight="bold",
-        )
-        nx.draw(
-            graph, pos, arrows=False,
-            node_color=sns.color_palette()[0],
-            width=2,
-        )
 
         plt.tight_layout()
 

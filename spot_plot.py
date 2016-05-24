@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec
 import matplotlib.patches
 import matplotlib.transforms
+import matplotlib.patheffects
 import glob
 import numpy as np
 import re
@@ -50,6 +51,31 @@ def _fmt_img(ax, mesh, xlim, ylim):
     _plot_mesh(ax, mesh)
     _plot_limits(ax, xlim, ylim)
     _deaxis(ax)
+
+
+def _plot_indicator(ax, idx, mesh):
+    x, y, x2, y2 = mesh[idx]
+    angle = np.arctan((y2 - y) / (x2 - x))
+    if x > x2:
+        angle = np.arctan((y - y2) / (x - x2))
+        x, y = x2, y2
+
+    if np.isnan(angle):
+        angle = 0.5
+
+    xpos2 = x - (10 * np.cos(angle))
+    ypos2 = y - (10 * np.sin(angle))
+
+    ax.annotate(
+        "", xy=(x, y), xycoords="data",
+        xytext=(xpos2, ypos2),
+        arrowprops={
+            "arrowstyle": "wedge,tail_width=1.5",
+            "fc": "w",
+            "shrinkA": 2,
+            "shrinkB": 2,
+        }
+    )
 
 
 def plot_images(cell_line, lineage_num, plot_parA=True):
@@ -130,8 +156,7 @@ def plot_images(cell_line, lineage_num, plot_parA=True):
             ax.imshow(parA_img)
 
             # plot ParA focus as white spot
-            x, y = cell.M_x[cell.ParA[0]], cell.M_y[cell.ParA[0]]
-            plt.plot(x, y, "wo", ms=10)
+            _plot_indicator(ax, cell.ParA[0], cell.mesh)
             _fmt_img(ax, cell.mesh, (xmin, xmax), (ymax, ymin))
 
         # plot ParB in RGB green with white mesh
@@ -146,8 +171,7 @@ def plot_images(cell_line, lineage_num, plot_parA=True):
         ax.imshow(parB_img)
         # plot ParB foci as white spots
         for parB in cell.ParB:
-            x, y = cell.M_x[parB[0]], cell.M_y[parB[0]]
-            plt.plot(x, y, "wo", ms=10)
+            _plot_indicator(ax, parB[0], cell.mesh)
         _fmt_img(ax, cell.mesh, (xmin, xmax), (ymax, ymin))
 
         # plot line-scan profile
@@ -179,6 +203,42 @@ def plot_images(cell_line, lineage_num, plot_parA=True):
 
 def decorate_daughters(cell_line, lineage, ax, pad=10, labels=None, um=False):
     parent_cell = cell_line[-1]
+
+    # add parent cell with number on left
+    trans = matplotlib.transforms.blended_transform_factory(
+        ax.transAxes, ax.transData
+    )
+    first = matplotlib.patches.FancyBboxPatch(
+        (0.02, -cell_line[0].length[0][0] * PX / 2),
+        height=cell_line[0].length[0][0] * PX,
+        width=0.05,
+        boxstyle=matplotlib.patches.BoxStyle.Round4(
+            pad=0, rounding_size=0.02,
+        ),
+        fill=False,
+        edgecolor="k",
+        linewidth=2,
+        transform=trans,
+    )
+    ax.add_patch(first)
+
+    if not labels:
+        parent_label = r"\tiny{?}"
+    else:
+        parent_label = r"\tiny{{{0}}}".format(labels[cell_line[-1].id])
+
+    text_params = {
+        "transform": trans,
+        "ha": "center",
+        "va": "center",
+        "fontsize": 10,
+    }
+
+    ax.text(
+        0.045, 0,
+        parent_label,
+        **text_params,
+    )
 
     # plot approximate division site
     children_ids = parent_cell.children
@@ -283,12 +343,6 @@ def decorate_daughters(cell_line, lineage, ax, pad=10, labels=None, um=False):
         ax.add_patch(cell2)
 
         # add text
-        text_params = {
-            "transform": trans,
-            "ha": "center",
-            "va": "center",
-            "fontsize": 10,
-        }
         text_x = lowerleft_x + width / 2
         if um:
             text_y1 = lowerleft_y1 + child1.length[0][0] * PX / 2
@@ -299,14 +353,14 @@ def decorate_daughters(cell_line, lineage, ax, pad=10, labels=None, um=False):
         ax.text(
             text_x,
             text_y1,
-            child1_num,
+            r"\tiny{{{0}}}".format(child1_num),
             **text_params
         )
 
         ax.text(
             text_x,
             text_y2,
-            child2_num,
+            r"\tiny{{{0}}}".format(child2_num),
             **text_params
         )
 
@@ -323,10 +377,12 @@ def decorate_daughters(cell_line, lineage, ax, pad=10, labels=None, um=False):
 
         # add 10% to xlim
         xlimadd = (cell_line[0].t[-1] - cell_line[0].t[0]) / 10
+
         _plot_limits(
             ax,
             (
-                cell_line[0].t[0] - 8,
+                # subtract 5% of total xlimit
+                cell_line[0].t[0] - pad - width - xlimadd,
                 cell_line[0].t[-1] + 2 + pad + width + xlimadd
             ),
             (
@@ -342,11 +398,20 @@ def decorate_daughters(cell_line, lineage, ax, pad=10, labels=None, um=False):
             y00 = -(parent_cell.length / 2) - 1
             y01 = parent_cell.length / 2 + 1
 
+        dt = cell_line[0].t[-1] - cell_line[0].t[0]
+        width = 0.05
+        xlimitleft = pad + width + dt / 10
+        if dt < 250:
+            dt = 250
+            xlimitright = (250 - dt) + pad
+        else:
+            xlimitright = pad
+
         _plot_limits(
             ax,
             (
-                min(cell_line[0].t) - 8,
-                max(cell_line[0].t) + 7
+                min(cell_line[0].t) - xlimitleft,
+                max(cell_line[0].t) + xlimitright
             ),
             (
                 y00,
@@ -432,7 +497,7 @@ def plot_graphs_parB_only(cell_line, lineage_num, ax_parB=None, save=True, label
         plt.close()
 
 
-def plot_graphs(cell_line, lineage_num, num_plots=5, parA_heatmap=None, save=True, labels=None, um=False):
+def plot_graphs(cell_line, lineage_num, num_plots=5, parA_heatmap=None, save=True, labels=None, um=False, plot_kwargs=None):
     lineage = track.Lineage()
     if save:
         fig = plt.figure(figsize=(20, 10))
@@ -549,13 +614,7 @@ def plot_graphs(cell_line, lineage_num, num_plots=5, parA_heatmap=None, save=Tru
 
     spots_ParB = shared.get_parB_path(cell_line, T, lineage_num)
     spotnum = 1
-    if len(spots_ParB) == 1:
-        n_colors = 2
-    else:
-        n_colors = len(spots_ParB)
-    colourwheel = sns.color_palette(n_colors=n_colors)
     for x in spots_ParB:
-        colour = colourwheel[spotnum - 1]
         s = x.spots(False)
         if hasattr(x, "split_parent") and x.split_parent:
             for y in spots_ParB:
@@ -580,15 +639,36 @@ def plot_graphs(cell_line, lineage_num, num_plots=5, parA_heatmap=None, save=Tru
             label = "Spot {0}".format(spotnum)
         else:
             ax_target = parA_heatmap
-            colour = colourwheel[1]
             label = "ParB"
 
-        ax_target.plot(
-            timings, positions,
-            lw=2, marker=".", markeredgecolor="k", ms=10,
-            label=label,
-            color=colour
-        )
+        if plot_kwargs:
+            ax_target.plot(
+                timings, positions, **plot_kwargs
+            )
+        else:
+#            ax_target.plot(
+#                timings, positions,
+#                lw=2,
+#                marker=".",
+#                markeredgecolor="k",
+#                ms=10,
+#                label=label,
+#                color=colour,
+#            )
+            ax_target.plot(
+                timings, positions,
+                lw=2,
+                marker=".",
+                markeredgecolor="k",
+                ms=10,
+                label=label,
+                color="k",
+                path_effects=[
+                    matplotlib.patheffects.Stroke(
+                        linewidth=2, foreground=(0.7, 0.7, 0.7)
+                    )
+                ],
+            )
 
         dparA = []
         for spot in s:
