@@ -140,25 +140,20 @@ def swarm2(ax, data, xvar1, xlabel1, xvar2, xlabel2, yvar, ylabel):
     y20 = dataset.max() + (dataset.max() - dataset.min()) * 0.2
     if curr_ymax < y20:
         ax.set_ylim([curr_ylim[0], y20])
-    ymax = dataset.max() + (dataset.max() - dataset.min()) * 0.15
+#    ymax = dataset.max() + (dataset.max() - dataset.min()) * 0.15
     ax.annotate(
         r"$p = {0:.5f}$".format(pvalue),
         xy=(0.5, 0.95),
         horizontalalignment="center",
         xycoords=ax.transAxes,
     )
-#    ax.annotate(
-#        "",
-#        xy=(0, dataset.max()),
-#        xytext=(1, dataset.max()),
-#        arrowprops={
-#            "connectionstyle": "bar",
-#            "arrowstyle": "-",
-#            "shrinkA": 20,
-#            "shrinkB": 20,
-#            "lw": 2
-#        }
-#    )
+    ax.annotate(
+        r"$n = {0}$".format(len(data[xvar1].dropna())),
+        xy=(0.5, 0.9),
+        horizontalalignment="center",
+        xycoords=ax.transAxes,
+    )
+
     ax.set_ylabel(ylabel)
     labels = [xlabel1, xlabel2]
     ax.set_xticklabels(labels)
@@ -176,10 +171,12 @@ def plot_swarms(data, xvar, xlabels, yvars, title, outfn, redata=False):
     plot_num = 1
     for yvar in yvars:
         ax = plt.subplot(3, 2, plot_num)
+        yvar1 = "child1_{0}".format(yvar[0])
+        yvar2 = "child2_{0}".format(yvar[0])
         swarm2(
-            ax, re_data,
-            "child1_{0}".format(yvar[0]), xlabels[0],
-            "child2_{0}".format(yvar[0]), xlabels[1],
+            ax, re_data[re_data[xvar] >= 1],
+            yvar1, xlabels[0],
+            yvar2, xlabels[1],
             "max_ratio", yvar[1]
         )
         plot_num += 1
@@ -319,7 +316,7 @@ def process():
         c1_max = get_intensity(child1, "max")
         c2_max = get_intensity(child2, "max")
 
-        c1_maximal = get_maximal(child1)
+#        c1_maximal = get_maximal(child1)
 
         c1_split = get_parB_split(child1_lin, child1_num)
         c2_split = get_parB_split(child2_lin, child2_num)
@@ -332,12 +329,11 @@ def process():
         l_ratio = (child1.length / child2.length)[0][0]  # ratio of child lengths
         a_ratio = (child1.area / child2.area)[0][0]  # ratio of child areas
 
-
         cwd = os.getcwd()
         twd, subdir = os.path.split(cwd)
         topdir = os.path.basename(twd)
         unique_id = hashlib.sha1(
-            "{0} {1} {2}".format( topdir, subdir, parent_num).encode("utf-8")
+            "{0} {1} {2}".format(topdir, subdir, parent_num).encode("utf-8")
         ).hexdigest()
         temp = [
             topdir,
@@ -479,7 +475,7 @@ def plot_ratios(data, outfn):
 
 def plot_grid(data):
     g = sns.PairGrid(
-        all_data.dropna(),
+        data.dropna(),
         vars=[
             "child_ratio", "max_ratio", "area_ratio",
             "parent_growth", "child1_growth", "child2_growth",
@@ -511,6 +507,13 @@ def plot_representation(data, spnum):
     sns.despine()
 
 
+def plot_totals(data, outfn):
+    plt.figure()
+    plot_representation(data, 221)
+    plt.tight_layout()
+    plt.savefig("ParA_inheritance/{0}.pdf".format(outfn))
+
+
 def compare_representations(data1, data2, outfn):
     fig = plt.figure()
     fig.text(0.02, 0.78, r"\textbf{Sorted by length\_ratio}", ha="center", va="center", rotation="vertical")
@@ -522,7 +525,7 @@ def compare_representations(data1, data2, outfn):
     plt.tight_layout()
 
     fig.subplots_adjust(left=0.16)
-    plt.savefig("ParA_inheritance/total-max-area.pdf")
+    plt.savefig("ParA_inheritance/{0}.pdf".format(outfn))
 
 
 def main():
@@ -567,14 +570,21 @@ def main():
         ("elongation", "Elongation Rate (\si{\micro\metre{\per\hour}})"),
         ("growth", "Growth Rate (\si{\per\hour})"),
     ]
-    re_data = plot_swarms(all_data, "max_ratio", ("High Inheritor", "Low Inheritor"),
-                default_yvars, "Maximum ParA Intensity", "max_ratio_swarms")
-    plot_swarms(re_data, "area_ratio", ("Larger Sibling", "Smaller Sibling"),
-                default_yvars, "Cell Area", "area_ratio_swarms", redata=True)
-    plot_swarms(re_data, "child_ratio", ("High Inheritor", "Low Inheritor"),
-                default_yvars, "Total ParA Intensity", "total_ratio_swarms", redata=True)
+    re_data = plot_swarms(
+        all_data, "max_ratio", ("High Inheritor", "Low Inheritor"),
+        default_yvars, "Maximum ParA Intensity", "max_ratio_swarms"
+    )
+    plot_swarms(
+        all_data, "area_ratio", ("Larger Sibling", "Smaller Sibling"),
+        default_yvars, "Cell Area", "area_ratio_swarms"
+    )
+    plot_swarms(
+        all_data, "child_ratio", ("High Inheritor", "Low Inheritor"),
+        default_yvars, "Total ParA Intensity", "total_ratio_swarms"
+    )
 
-    # compare_representations(all_data, re_data, "total-max-area")
+#    compare_representations(all_data, re_data, "total-max-area")
+    plot_totals(all_data, "total-max-area")
 
     plot_ratios(re_data, "ratios-sanity")
 
