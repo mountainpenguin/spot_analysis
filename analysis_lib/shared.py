@@ -7,6 +7,8 @@ import hashlib
 import random
 import string
 import os
+import matplotlib.pyplot as plt
+import scipy.stats
 
 
 class TraceConnect(object):
@@ -271,10 +273,31 @@ def get_growth_rate(lin, PX=0.12254):
     return np.polyfit(timings, logLength, 1)[0]
 
 
-def get_elongation_rate(lin, PX=0.12254):
+def get_elongation_rate(lin, PX=0.12254, discard=False):
     """ Linear method of determining growth rate """
     if len(lin) < 3:
         return None
     timings = lin[0].t / 60
     lengths = [x.length[0][0] * PX for x in lin]
-    return np.polyfit(timings, lengths, 1)[0]
+    elongation_rate = np.polyfit(timings, lengths, 1)[0]
+    if discard and elongation_rate < 0:
+        return 0
+    return elongation_rate
+
+
+def add_stats(data, xkey, ykey, ax=None, m=True, r2=True, n=True):
+    if not ax:
+        ax = plt.gca()
+    plt.sca(ax)
+    dataset = data[[xkey, ykey]].dropna()
+    x = dataset[xkey]
+    y = dataset[ykey]
+
+    slope, intercept, rvalue, pvalue, stderr = scipy.stats.linregress(x, y)
+    if m:
+        plt.plot(x[0], y[0], color="none", alpha=1, label=r"$m = {0:.5f}$".format(slope))
+    if r2:
+        plt.plot(x[0], y[0], color="none", alpha=1, label=r"$r^2 = {0:.5f}$".format(rvalue ** 2))
+    if n:
+        plt.plot(x[0], y[0], color="none", alpha=1, label=r"$n = {0}$".format(len(dataset)))
+    plt.legend()

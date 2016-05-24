@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 sns.set_style("white")
 sns.set_context("paper")
-# import scipy.stats
+import scipy.stats
 import hashlib
 import progressbar
 
@@ -59,7 +59,9 @@ def get_traces():
 #        pole_assignment = cell_line[0].pole_assignment
         T = cell_line[0].T
         paths = shared.get_parB_path(cell_line, T, lineage_num)
-        cell_elongation_rate = get_elongation_rate(cell_line)
+        cell_elongation_rate = shared.get_elongation_rate(cell_line)
+        if cell_elongation_rate and cell_elongation_rate < 0:
+            cell_elongation_rate = 0
         spot_num = 1
         for path in paths:
             # path.positions: distance from midcell

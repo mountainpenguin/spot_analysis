@@ -213,12 +213,12 @@ def versus(data, x, y, xlabel="ratio", ylabels=("growth1", "growth2"), outfn="ve
 
     plt.subplot(131)
     sns.regplot(x="x", y="y1", data=re_data)
-    add_stats(re_data, "x", "y1")
+    shared.add_stats(re_data, "x", "y1")
     sns.despine()
 
     plt.subplot(132)
     sns.regplot(x="x", y="y2", data=re_data)
-    add_stats(re_data, "x", "y2")
+    shared.add_stats(re_data, "x", "y2")
     sns.despine()
 
     ax = plt.subplot(133)
@@ -226,20 +226,6 @@ def versus(data, x, y, xlabel="ratio", ylabels=("growth1", "growth2"), outfn="ve
 
     plt.tight_layout()
     plt.savefig("ParA_inheritance/{0}.pdf".format(outfn))
-
-def add_stats(data, xkey, ykey):
-    dataset = data[[xkey, ykey]].dropna()
-    x = dataset[xkey]
-    y = dataset[ykey]
-
-    slope, intercept, rvalue, pvalue, stderr = scipy.stats.linregress(x, y)
-    plt.plot(x[0], y[0], color="none", alpha=1, label=r"$m = {0:.5f}$".format(slope))
-#    plt.plot(x[0], y[0], color="none", alpha=1, label=r"$r = {0:.5f}$".format(rvalue))
-    plt.plot(x[0], y[0], color="none", alpha=1, label=r"$r^2 = {0:.5f}$".format(rvalue ** 2))
-#    plt.plot(x[0], y[0], color="none", alpha=1, label=r"$p = {0:.5f}$".format(pvalue))
-    plt.plot(x[0], y[0], color="none", alpha=1, label=r"$n = {0}$".format(len(dataset)))
-    plt.legend()
-
 
 
 def get_parB_split(lin, lin_num):
@@ -415,7 +401,7 @@ def sanity_check(data):
     plt.title("Total Intensity Ratio")
     sns.despine()
     sns.regplot(x="area_ratio", y="child_ratio", data=data)
-    add_stats(data, "area_ratio", "child_ratio")
+    shared.add_stats(data, "area_ratio", "child_ratio")
     plt.xlabel("area\_ratio")
     plt.ylabel("child\_ratio")
     plt.legend(loc=2)
@@ -424,7 +410,7 @@ def sanity_check(data):
     plt.title("Max Intensity Ratio")
     sns.despine()
     sns.regplot(x="area_ratio", y="max_ratio", data=data)
-    add_stats(data, "area_ratio", "max_ratio")
+    shared.add_stats(data, "area_ratio", "max_ratio")
     plt.xlabel("area\_ratio")
     plt.ylabel("max\_ratio")
     plt.legend(loc=4)
@@ -456,7 +442,7 @@ def plot_ratios(data, outfn):
     sns.despine()
     sns.regplot(x="area_ratio", y="child_ratio", data=data)
     # plot regression line
-    add_stats(data, "area_ratio", "child_ratio")
+    shared.add_stats(data, "area_ratio", "child_ratio")
     plt.xlabel("area\_ratio")
     plt.ylabel("child\_ratio")
     plt.legend(loc=2)
@@ -466,7 +452,7 @@ def plot_ratios(data, outfn):
     plt.title("Max Intensity Ratio")
     sns.despine()
     sns.regplot(x="area_ratio", y="max_ratio", data=data)
-    add_stats(data, "area_ratio", "max_ratio")
+    shared.add_stats(data, "area_ratio", "max_ratio")
     plt.xlabel("area\_ratio")
     plt.ylabel("max\_ratio")
     plt.legend(loc=4)
@@ -512,14 +498,14 @@ def plot_representation(data, spnum):
 
     plt.subplot(spnum)
     sns.regplot(x="area", y="total", data=d)
-    add_stats(d, "area", "total")
+    shared.add_stats(d, "area", "total", m=False)
     plt.xlabel("Cell Area (um$^2$)")
     plt.ylabel("Total ParA Intensity (AU)")
     sns.despine()
 
     plt.subplot(spnum + 1)
     sns.regplot(x="area", y="max", data=d)
-    add_stats(d, "area", "max")
+    shared.add_stats(d, "area", "max", m=False)
     plt.xlabel("Cell Area (um$^2$)")
     plt.ylabel("Maximum ParA Intensity (AU)")
     sns.despine()
