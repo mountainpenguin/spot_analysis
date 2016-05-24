@@ -31,23 +31,17 @@ THRESHOLD = 0  # um / hr threshold for movement
 MIN_POINTS = 5
 
 
-def get_elongation_rate(cell_line):
-    t = cell_line[0].t
-    l = [
-        c.length[0][0] * PX for c in cell_line
-    ]
-    if len(t) < MIN_POINTS:
-        return 0
+def get_traces(orig_dir=None):
+    data_hash = hashlib.sha1(os.getcwd().encode("utf8")).hexdigest()
+    if orig_dir and os.path.exists(os.path.join(orig_dir, "ParB_velocity", "data", data_hash)):
+        data_dir = os.path.join(orig_dir, "ParB_velocity", "data", data_hash)
+        files = sorted(glob.glob(os.path.join(data_dir, "*.pandas")))
+        spot_data = []
+        progress = progressbar.ProgressBar()
+        for f in progress(files):
+            spot_data.append(pd.read_pickle(f))
+        return spot_data
 
-    pf = np.polyfit(t, l, 1)
-    elongation_rate = pf[0] * 60
-    if elongation_rate < 0:
-        elongation_rate = 0
-
-    return elongation_rate
-
-
-def get_traces():
     lin_files = sorted(glob.glob("data/cell_lines/lineage*.npy"))
     lineage_nums = [int(re.search("lineage(\d+).npy", x).group(1)) for x in lin_files]
     spot_data = []
@@ -99,6 +93,20 @@ def get_traces():
                 lineage_num,
                 spot_num,
             ).encode("utf-8")).hexdigest()
+            data._metadata = [
+                "_path", "_top_dir", "_sub_dir", "_lineage_num",
+                "_spot_num", "_cell_line_id",
+                "_elongation_rate", "_hash"
+            ]
+
+            if orig_dir:
+                target_dir = os.path.join(orig_dir, "ParB_velocity", "data", data_hash)
+                if not os.path.exists(target_dir):
+                    os.makedirs(target_dir)
+                data.to_pickle(os.path.join(
+                    target_dir, "{0:03d}-{1:03d}.pandas".format(lineage_num, spot_num)
+                ))
+
             spot_data.append(data)
             spot_num += 1
     return spot_data
@@ -456,9 +464,14 @@ def save_stats(vdata, prefix=""):
     perc = lambda x, y: ws.cell(row=x - 13, column=y).value / ws.cell(row=10, column=2).value
     repl = lambda x, y: ws.cell(row=x - 13, column=y).value
     total_xl = [
-        *new_xl,
+        new_xl[0],
+        new_xl[1],
+        new_xl[2],
+        new_xl[3],
         (),
-        *old_xl[1:],
+        old_xl[1],
+        old_xl[2],
+        old_xl[3],
         (),
         ("Total", summer, "Away", summer, summer, summer, summer),
         ("", "", "Towards", summer, summer, summer, summer),
@@ -532,6 +545,20 @@ def plot_stats(vdata, prefix=""):
         ci=95
     )
 
+    # t-test between all pair-wise
+    # new towards vs old towards
+    # new away vs old away
+    ttest1 = scipy.stats.ttest_ind(
+        vdata[(vdata.tether == "new") & (vdata.direction == "towards")].v_abs,
+        vdata[(vdata.tether == "old") & (vdata.direction == "towards")].v_abs
+    )
+    print("New towards vs Old towards", ttest1)
+    ttest2 = scipy.stats.ttest_ind(
+        vdata[(vdata.tether == "new") & (vdata.direction == "away")].v_abs,
+        vdata[(vdata.tether == "old") & (vdata.direction == "away")].v_abs
+    )
+    print("New away vs Old away", ttest2)
+
     ax.set_xlabel("")
     ax.set_ylabel("Velocity (\si{\micro\metre\per\hour})")
 
@@ -542,7 +569,7 @@ def plot_stats(vdata, prefix=""):
     ax = fig.add_subplot(rows, cols, sp_num + 1)
     sns.countplot(
         x="tether",
-        data=vdata,
+        data=vdata[vdata.tether != None],
         hue="direction",
         order=["new", "old"],
         hue_order=hue_order,
@@ -802,7 +829,7 @@ if __name__ == "__main__":
                     if os.path.isdir(target) and sum(conf) == len(conf):
                         os.chdir(target)
                         print("  Handling {0}".format(target))
-                        data.extend(get_traces())
+                        data.extend(get_traces(orig_dir=orig_dir))
                         os.chdir(orig_dir)
             run(data, prefix=prefix)
     elif os.path.exists("wanted.json"):
