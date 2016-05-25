@@ -564,11 +564,11 @@ def main():
 #    )
 #
     default_yvars = [
-        ("length", "Length (px)"),
-        ("area", r"Area (px$^2$)"),
+        ("length", "Length (\si{\micro\metre})"),
+        ("area", r"Area (\si{\square\micro\metre})"),
         ("total", "ParA Total Intensity (AU)"),
         ("max", "ParA Maximum Intensity (AU)"),
-        ("elongation", "Elongation Rate (\si{\micro\metre{\per\hour}})"),
+        ("elongation", "Elongation Rate (\si{\micro\metre\per\hour})"),
         ("growth", "Growth Rate (\si{\per\hour})"),
     ]
     re_data = plot_swarms(
