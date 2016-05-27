@@ -4,6 +4,7 @@ import glob
 import json
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.transforms
 import skimage.draw
 import seaborn as sns
 sns.set_context("paper")
@@ -129,6 +130,24 @@ def swarm(ax, data, xlabel1, xlabel2, ylabel):
 
 def swarm2(ax, data, xvar1, xlabel1, xvar2, xlabel2, yvar, ylabel):
     sns.swarmplot(data=data[[xvar1, xvar2]])
+    # plot mean value
+    trans = matplotlib.transforms.blended_transform_factory(
+        ax.transAxes, ax.transData
+    )
+    plt.plot(
+        [0.1, 0.4],
+        [data[xvar1].mean(), data[xvar1].mean()],
+        "r-",
+        transform=trans,
+    )
+
+    plt.plot(
+        [0.6, 0.9],
+        [data[xvar2].mean(), data[xvar2].mean()],
+        "r-",
+        transform=trans,
+    )
+
     pvalue = scipy.stats.ttest_ind(
         data[xvar1].dropna(),
         data[xvar2].dropna(),
@@ -576,7 +595,7 @@ def main():
         default_yvars, "Maximum ParA Intensity", "max_ratio_swarms"
     )
     plot_swarms(
-        all_data, "area_ratio", ("Larger Sibling", "Smaller Sibling"),
+        all_data, "area_ratio", ("Larger Sister", "Smaller Sister"),
         default_yvars, "Cell Area", "area_ratio_swarms"
     )
     plot_swarms(

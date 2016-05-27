@@ -10,14 +10,12 @@ import re
 import pandas as pd
 from pandas import ExcelWriter
 import matplotlib.pyplot as plt
+from matplotlib import rc
 import seaborn as sns
-sns.set_style("white")
-sns.set_context("paper")
 import scipy.stats
 import hashlib
 import progressbar
 
-from matplotlib import rc
 rc("font", **{"family": "sans-serif", "sans-serif": ["Helvetica"]})
 rc("text", usetex=True)
 plt.rcParams["text.latex.preamble"] = [
@@ -25,9 +23,16 @@ plt.rcParams["text.latex.preamble"] = [
     r"\sisetup{detect-all}",
 ]
 
+sns.set_style("white")
+sns.set_context("paper")
+sns.set_palette([
+    (29 / 256, 56 / 256, 105 / 256),
+    (94 / 256, 158 / 256, 110 / 256),
+    (251 / 256, 245 / 256, 171 / 256)
+])
 
 PX = 0.12254
-THRESHOLD = 0  # um / hr threshold for movement
+THRESHOLD = 0.15  # um / hr threshold for movement
 MIN_POINTS = 5
 
 
@@ -552,13 +557,34 @@ def plot_stats(vdata, prefix=""):
         vdata[(vdata.tether == "new") & (vdata.direction == "towards")].v_abs,
         vdata[(vdata.tether == "old") & (vdata.direction == "towards")].v_abs
     )
-    print("New towards vs Old towards", ttest1)
+    print("New towards vs Old towards:", ttest1.pvalue)
+
+    # add p-value
+    dataset1 = vdata[(vdata.tether == "new") & (vdata.direction == "towards")].v_abs
+    dataset2 = vdata[(vdata.tether == "old") & (vdata.direction == "towards")].v_abs
+    if dataset1.mean() > dataset2.mean():
+        mean = dataset1.mean()
+    else:
+        mean = dataset2.mean()
+    y20 = mean + (mean * 0.2)
+    curr_ylim = ax.get_ylim()
+    if curr_ylim[1] < y20:
+        ax.set_ylim([curr_ylim[0], y20])
+
+    ax.annotate(
+        r"$p = {0:.05f}$".format(ttest1.pvalue),
+        xy=(0.5, 0.95),
+        horizontalalignment="center",
+        xycoords=ax.transAxes,
+    )
+
     ttest2 = scipy.stats.ttest_ind(
         vdata[(vdata.tether == "new") & (vdata.direction == "away")].v_abs,
         vdata[(vdata.tether == "old") & (vdata.direction == "away")].v_abs
     )
-    print("New away vs Old away", ttest2)
+    print("New away vs Old away:", ttest2.pvalue)
 
+    ax.set_xticklabels(["New", "Old"])
     ax.set_xlabel("")
     ax.set_ylabel("Velocity (\si{\micro\metre\per\hour})")
 
@@ -574,8 +600,9 @@ def plot_stats(vdata, prefix=""):
         order=["new", "old"],
         hue_order=hue_order,
     )
+    ax.set_xticklabels(["New", "Old"])
     ax.set_xlabel("")
-    ax.set_ylabel("Number of Spots")
+    ax.set_ylabel("Number of Foci")
     sns.despine()
 
     plt.tight_layout()
@@ -705,7 +732,7 @@ def sub_analysis(vdata, prefix=""):
     fig = plt.figure()
     _bigax(
         fig,
-        xlabel=("Direction relative to mid-cell", {"labelpad": 10}),
+        xlabel=("Direction Relative to Midcell", {"labelpad": 10}),
         spec=(2, 1, 1),
     )
     ax = fig.add_subplot(2, 2, 1)
@@ -765,6 +792,8 @@ def sub_analysis(vdata, prefix=""):
         data=new_set,
         order=["towards", "away", "static"],
     )
+    ax.set_xlabel("")
+    ax.set_ylabel("Number of Foci")
     sns.despine()
 
     ax = fig.add_subplot(2, 2, 4)
@@ -778,6 +807,8 @@ def sub_analysis(vdata, prefix=""):
         data=old_set,
         order=["towards", "away", "static"],
     )
+    ax.set_xlabel("")
+    ax.set_ylabel("Number of Foci")
     sns.despine()
 
     plt.tight_layout()
