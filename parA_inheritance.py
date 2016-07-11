@@ -266,27 +266,27 @@ def get_maximal(cell):
 
 
 def get_intensity(cell, method="sum"):
-    # get mask
-    mask_vertices = [cell.mesh[0, 0:2]]
-    for coords in cell.mesh[1:-1, 0:2]:
-        mask_vertices.append(coords)
-
-    mask_vertices.append(cell.mesh[-1, 0:2])
-    for coords in cell.mesh[1:-1, 2:4][::-1]:
-        mask_vertices.append(coords)
-
-    mask_vertices.append(cell.mesh[0, 0:2])
-    mask_vertices = np.array(mask_vertices)
-
-    x = mask_vertices[:, 0]
-    y = mask_vertices[:, 1]
-    rows, cols = skimage.draw.polygon(y, x)
-    xlim, ylim = cell.parA_img.shape
-    rows[rows >= xlim] = xlim - 1
-    cols[cols >= ylim] = ylim - 1
-    values = cell.parA_img[rows, cols]
-
     if method == "sum":
+        # get mask
+        mask_vertices = [cell.mesh[0, 0:2]]
+        for coords in cell.mesh[1:-1, 0:2]:
+            mask_vertices.append(coords)
+
+        mask_vertices.append(cell.mesh[-1, 0:2])
+        for coords in cell.mesh[1:-1, 2:4][::-1]:
+            mask_vertices.append(coords)
+
+        mask_vertices.append(cell.mesh[0, 0:2])
+        mask_vertices = np.array(mask_vertices)
+
+        x = mask_vertices[:, 0]
+        y = mask_vertices[:, 1]
+        rows, cols = skimage.draw.polygon(y, x)
+        xlim, ylim = cell.parA_img.shape
+        rows[rows >= xlim] = xlim - 1
+        cols[cols >= ylim] = ylim - 1
+        values = cell.parA_img[rows, cols]
+
         intensity = values.sum()
     else:
         intensity = values.max()
@@ -390,23 +390,26 @@ def process():
 def iterate():
     # iterate through all folders
     original_path = os.getcwd()
-    dirs = filter(lambda x: os.path.isdir(x), os.listdir())
+#    dirs = filter(lambda x: os.path.isdir(x), os.listdir())
+    dirs = json.loads(open("wanted.json").read()).keys()
 
     all_data = pd.DataFrame(columns=DATA_INDEX)
     for d in dirs:
-        query = input("Process {0}? (Y/n): ".format(d))
-        if query.lower() != "n":
-            subdirs = filter(lambda y: os.path.isdir(os.path.join(d, y)), os.listdir(d))
-            for subdir in subdirs:
-                exists = ["mt", "ancestry.json", "lineages.json", "data/cell_lines/lineage01.npy"]
-                if sum([os.path.exists(os.path.join(d, subdir, z)) for z in exists]) == len(exists):
-                    os.chdir(os.path.join(d, subdir))
-                    print("< {0}".format(os.path.join(d, subdir)))
-                    out = process()
-                    if len(out) > 0:
-                        all_data = all_data.append(out)
-                    os.chdir(original_path)
+#        query = input("Process {0}? (Y/n): ".format(d))
+#        if query.lower() != "n":
+        subdirs = filter(lambda y: os.path.isdir(os.path.join(d, y)), os.listdir(d))
+        for subdir in subdirs:
+            exists = ["mt", "ancestry.json", "lineages.json", "data/cell_lines/lineage01.npy"]
+            if sum([os.path.exists(os.path.join(d, subdir, z)) for z in exists]) == len(exists):
+                os.chdir(os.path.join(d, subdir))
+                print("< {0}".format(os.path.join(d, subdir)))
+                out = process()
+                if len(out) > 0:
+                    all_data = all_data.append(out)
+                os.chdir(original_path)
 
+    if not os.path.exists("ParA_inheritance"):
+        os.mkdir("ParA_inheritance")
     all_data.to_pickle("ParA_inheritance/data.pandas")
     return all_data
 
