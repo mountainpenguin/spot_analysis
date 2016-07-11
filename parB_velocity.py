@@ -36,7 +36,7 @@ THRESHOLD = 0.15  # um / hr threshold for movement
 MIN_POINTS = 5
 
 
-def get_traces(orig_dir=None):
+def get_traces(orig_dir=None, two_spot=False):
     data_hash = hashlib.sha1(os.getcwd().encode("utf8")).hexdigest()
     if orig_dir and os.path.exists(os.path.join(orig_dir, "ParB_velocity", "data", data_hash)):
         data_dir = os.path.join(orig_dir, "ParB_velocity", "data", data_hash)
@@ -56,8 +56,17 @@ def get_traces(orig_dir=None):
         if not hasattr(cell_line[0], "pole_assignment") or cell_line[0].pole_assignment is None:
             continue
 #        pole_assignment = cell_line[0].pole_assignment
+
         T = cell_line[0].T
         paths = shared.get_parB_path(cell_line, T, lineage_num)
+
+        if two_spot:
+            if len(paths) != 3:
+                continue
+
+            if len(cell_line[0].ParB) != 1:
+                continue
+
         cell_elongation_rate = shared.get_elongation_rate(cell_line)
         if cell_elongation_rate and cell_elongation_rate < 0:
             cell_elongation_rate = 0
@@ -67,22 +76,33 @@ def get_traces(orig_dir=None):
             spot_trace = path.spots()
             timing = []
             d_mid = []
+            d_parA = []
+
             intensity = []
             lengths = path.len()
             for x in spot_trace:
                 timing.append(x[0])
                 d_mid.append(x[1])
                 intensity.append(x[2])
+
+                c_idx = list(cell_line[0].t).index(x[0])
+                cell = cell_line[c_idx]
+                parA_mid = cell.ParA[0]
+                d_parA.append(parA_mid - (cell.length[0][0] / 2))
+
             data = pd.DataFrame(
                 data={
                     "timing": timing,
                     "d_mid": d_mid,  # negative = closer to new pole
+                    "d_parA": d_parA,
                     "intensity": intensity,
                     "cell_length": lengths,
                 },
             )
+
             data["d_new"] = data.d_mid + (data.cell_length / 2)
             data["d_old"] = data.cell_length - data.d_new
+
             path, subdir = os.path.split(os.getcwd())
             topdir = os.path.basename(path)
             data._path = os.getcwd()
@@ -135,6 +155,14 @@ def get_velocities(data):
         # if negative: moving towards old pole
         # if positive: moving away from old pole
 
+        vparA = np.polyfit(timing, spot.d_parA.abs(), 1)[0] * PX * 60
+        if vparA < -THRESHOLD:
+            parA_direction = "towards"
+        elif vparA > THRESHOLD:
+            parA_direction = "away"
+        else:
+            parA_direction = "static"
+
 #        plt.figure()
 #        plt.plot(timing, spot.cell_length / 2, "k-", lw=2)
 #        plt.plot(timing, -spot.cell_length / 2, "k-", lw=2)
@@ -145,7 +173,7 @@ def get_velocities(data):
 #        plt.show()
 #        plt.close()
 
-        direction = "stationary"
+        direction = "static"
         if spot.d_mid[spot.index[-1]] < 0:
             # closer to new pole
             tether = "new"
@@ -186,8 +214,10 @@ def get_velocities(data):
             vnew,                   # v_new
             vold,                   # v_old
             np.abs(vabs),           # v_abs
+            vparA,                  # v_parA
             tether,                 # tether
             direction,              # direction
+            parA_direction,         # parA_direction
             spot._elongation_rate,  # elongation_rate
             len(timing),            # n
         )
@@ -248,8 +278,9 @@ def get_velocities(data):
 
     indexes = [
         "path", "top_dir", "sub_dir", "lin", "cid", "hash",
-        "v_mid", "v_new", "v_old", "v_abs",
-        "tether", "direction", "elongation_rate", "n",
+        "v_mid", "v_new", "v_old", "v_abs", "v_parA",
+        "tether", "direction", "parA_direction",
+        "elongation_rate", "n",
     ]
     velocities = pd.DataFrame(data=velocities, columns=indexes)
 #    print(velocities[["lin", "v_mid", "v_new", "v_old", "tether", "direction", "elongation_rate", "n"]])
@@ -342,10 +373,10 @@ def plot_traces(vdata, prefix=""):
                     p0, pn = _plot(d)
                     if p0:
                         p0.set_label("n = {0}".format(
-                            len(d[dataset.direction == "stationary"])
+                            len(d[dataset.direction == "static"])
                         ))
                     pn.set_label("n = {0}".format(
-                        len(d) - len(d[dataset.direction == "stationary"])
+                        len(d) - len(d[dataset.direction == "static"])
                     ))
                 ax.set_ylabel(labels_y[row_num])
             elif col_num == 1:
@@ -400,7 +431,7 @@ def _proc(x, tether):
     ]
     dta, dtt, dts = _sub_analyse(data_towards)
     data_static = data[
-        (x.direction == "stationary")
+        (x.direction == "static")
     ]
     data_static_a, data_static_t, data_static_s = _sub_analyse(data_static)
     if tether == "old":
@@ -449,6 +480,18 @@ def _proc(x, tether):
     return data_xl
 
 
+def _summer(row, col, ws):
+    return ws.cell(row=row - 4, column=col).value + ws.cell(row=row - 8, column=col).value
+
+
+def _perc(row, col, ws):
+    return ws.cell(row=row - 13, column=col).value / ws.cell(row=10, column=2).value
+
+
+def _repl(row, col, ws):
+    return ws.cell(row=row - 13, column=col).value
+
+
 def save_stats(vdata, prefix=""):
     writer = ExcelWriter(
         "ParB_velocity/{0}.xlsx".format(prefix or "default"),
@@ -465,9 +508,6 @@ def save_stats(vdata, prefix=""):
     ws.page_setup.fitToWidth = 1
 
     row = 1
-    summer = lambda x, y: ws.cell(row=x - 4, column=y).value + ws.cell(row=x - 8, column=y).value
-    perc = lambda x, y: ws.cell(row=x - 13, column=y).value / ws.cell(row=10, column=2).value
-    repl = lambda x, y: ws.cell(row=x - 13, column=y).value
     total_xl = [
         new_xl[0],
         new_xl[1],
@@ -478,22 +518,22 @@ def save_stats(vdata, prefix=""):
         old_xl[2],
         old_xl[3],
         (),
-        ("Total", summer, "Away", summer, summer, summer, summer),
-        ("", "", "Towards", summer, summer, summer, summer),
-        ("", "", "Static", summer, summer, summer, summer),
+        ("Total", _summer, "Away", _summer, _summer, _summer, _summer),
+        ("", "", "Towards", _summer, _summer, _summer, _summer),
+        ("", "", "Static", _summer, _summer, _summer, _summer),
         (),
         ("Percentage",),
-        (repl, perc, repl, perc, perc, perc, perc),
-        ("", "", repl, perc, perc, perc, perc),
-        ("", "", repl, perc, perc, perc, perc),
+        (_repl, _perc, _repl, _perc, _perc, _perc, _perc),
+        ("", "", _repl, _perc, _perc, _perc, _perc),
+        ("", "", _repl, _perc, _perc, _perc, _perc),
         (),
-        (repl, perc, repl, perc, perc, perc, perc),
-        ("", "", repl, perc, perc, perc, perc),
-        ("", "", repl, perc, perc, perc, perc),
+        (_repl, _perc, _repl, _perc, _perc, _perc, _perc),
+        ("", "", _repl, _perc, _perc, _perc, _perc),
+        ("", "", _repl, _perc, _perc, _perc, _perc),
         (),
-        (repl, perc, repl, perc, perc, perc, perc),
-        ("", "", repl, perc, perc, perc, perc),
-        ("", "", repl, perc, perc, perc, perc),
+        (_repl, _perc, _repl, _perc, _perc, _perc, _perc),
+        ("", "", _repl, _perc, _perc, _perc, _perc),
+        ("", "", _repl, _perc, _perc, _perc, _perc),
     ]
 
     for r in total_xl:
@@ -501,8 +541,8 @@ def save_stats(vdata, prefix=""):
         for c in r:
             if callable(c):
                 x = ws.cell(row=row, column=col)
-                x.value = c(row, col)
-                if c == perc:
+                x.value = c(row, col, ws)
+                if c == _perc:
                     x.number_format = "0.00%"
             elif c != "":
                 ws.cell(row=row, column=col).value = c
@@ -525,7 +565,7 @@ def plot_stats(vdata, prefix=""):
 
     sp_num = 1
     rows = 1
-    cols = 2
+    cols = 3
     row_num = 0
 
     _bigax(
@@ -538,7 +578,7 @@ def plot_stats(vdata, prefix=""):
     if THRESHOLD == 0:
         hue_order = ["towards", "away"]
     else:
-        hue_order = ["towards", "away", "stationary"]
+        hue_order = ["towards", "away", "static"]
 
     sns.barplot(
         x="tether",
@@ -571,18 +611,31 @@ def plot_stats(vdata, prefix=""):
     if curr_ylim[1] < y20:
         ax.set_ylim([curr_ylim[0], y20])
 
-    ax.annotate(
-        r"$p = {0:.05f}$".format(ttest1.pvalue),
-        xy=(0.5, 0.95),
-        horizontalalignment="center",
-        xycoords=ax.transAxes,
-    )
+    if ttest1.pvalue <= 0.05:
+        ax.annotate(
+            r"$p = {0:.05f}$".format(ttest1.pvalue),
+            xy=(0.5, 0.95),
+            horizontalalignment="center",
+            xycoords=ax.transAxes,
+        )
 
     ttest2 = scipy.stats.ttest_ind(
         vdata[(vdata.tether == "new") & (vdata.direction == "away")].v_abs,
         vdata[(vdata.tether == "old") & (vdata.direction == "away")].v_abs
     )
     print("New away vs Old away:", ttest2.pvalue)
+
+    ttest3 = scipy.stats.ttest_ind(
+        vdata[(vdata.tether == "new") & (vdata.direction == "towards")].v_abs,
+        vdata[(vdata.tether == "new") & (vdata.direction == "away")].v_abs
+    )
+    print("New towards vs New away:", ttest3.pvalue)
+
+    ttest4 = scipy.stats.ttest_ind(
+        vdata[(vdata.tether == "old") & (vdata.direction == "towards")].v_abs,
+        vdata[(vdata.tether == "old") & (vdata.direction == "away")].v_abs
+    )
+    print("Old towards vs Old away:", ttest4.pvalue)
 
     ax.set_xticklabels(["New", "Old"])
     ax.set_xlabel("")
@@ -599,6 +652,23 @@ def plot_stats(vdata, prefix=""):
         hue="direction",
         order=["new", "old"],
         hue_order=hue_order,
+    )
+    ax.set_xticklabels(["New", "Old"])
+    ax.set_xlabel("")
+    ax.set_ylabel("Number of Foci")
+    sns.despine()
+
+    ax = fig.add_subplot(rows, cols, sp_num + 2)
+    # add columns moving and not moving
+    vdata["movement"] = ((vdata.direction == "towards") | (vdata.direction == "away"))
+    vdata["movement"][vdata.movement] = "moving"
+    vdata["movement"][vdata.movement == False] = "not moving"
+    sns.countplot(
+        x="tether",
+        data=vdata[vdata.tether != None],
+        hue="movement",
+        order=["new", "old"],
+        hue_order=["moving", "not moving"],
     )
     ax.set_xticklabels(["New", "Old"])
     ax.set_xlabel("")
@@ -623,7 +693,7 @@ def plot_examples(data, vdata, prefix=""):
     num_rows = 4
     ystretch = 4
     if THRESHOLD > 0:
-        directions = ["towards", "away", "stationary"]
+        directions = ["towards", "away", "static"]
         xstretch = 4
         num_cols = 6
     else:
@@ -708,6 +778,171 @@ def _sub_analyse(x):
     b = x[(x.v_mid < -THRESHOLD)]
     c = x[(x.v_mid <= THRESHOLD) & (x.v_mid >= -THRESHOLD)]
     return(a, b, c)
+
+
+def _parA_plot(ax1, ax2, title, data):
+    plt.sca(ax1)
+    ax1.set_title(title)
+    sns.barplot(
+        x="parA_direction",
+        y=data.v_parA.abs(),
+        data=data,
+        order=["towards", "away", "static"],
+        ci=95
+    )
+    ax1.set_ylabel("Velocity (\si{\micro\metre\per\hour})")
+    ax1.set_xlabel("")
+    sns.despine()
+
+    plt.sca(ax2)
+    sns.countplot(
+        x="parA_direction",
+        data=data,
+        order=["towards", "away", "static"],
+    )
+    ax2.set_xlabel("")
+    ax2.set_ylabel("Number of Foci")
+    sns.despine()
+
+
+def parA_analysis(vdata, prefix=""):
+    """ Analysis of spot movement relative to ParA """
+    fig = plt.figure()
+    _bigax(
+        fig,
+        xlabel=("Direction relative to ParA peak", {"labelpad": 10}),
+        spec=(2, 1, 1),
+    )
+    ax1 = fig.add_subplot(2, 2, 1)
+    ax2 = fig.add_subplot(2, 2, 3)
+    new_data = vdata[vdata.tether == "new"]
+    _parA_plot(ax1, ax2, "New Pole", new_data)
+
+    ax1 = fig.add_subplot(2, 2, 2, sharey=ax1)
+    ax2 = fig.add_subplot(2, 2, 4, sharey=ax2)
+    old_data = vdata[vdata.tether == "old"]
+    _parA_plot(ax1, ax2, "Old Pole", old_data)
+
+    plt.tight_layout()
+
+    fn = os.path.join(
+        "ParB_velocity",
+        "{0}-ParA-T{1}-N{2}.pdf".format(prefix, THRESHOLD, MIN_POINTS)
+    )
+    print("Saved file to {0}".format(fn))
+    plt.savefig(fn)
+    plt.close()
+
+    plt.figure()
+    ax3 = fig.add_subplot(1, 1, 1)
+    vdata["parAmovement"] = ((vdata.parA_direction == "towards") | (vdata.parA_direction == "static"))
+    vdata["parAmovement"][vdata.parAmovement] = "static\/towards"
+    vdata["parAmovement"][vdata.parAmovement == False] = "away"
+
+    sns.countplot(
+        x="tether",
+        data=vdata[vdata.tether != None],
+        hue="parAmovement",
+        order=["new", "old"],
+        hue_order=["static\/towards", "away"],
+    )
+    ax3.set_xticklabels(["New", "Old"])
+    ax3.set_xlabel("")
+    ax3.set_ylabel("Number of Foci")
+    sns.despine()
+    plt.tight_layout()
+
+    fn = os.path.join(
+        "ParB_velocity",
+        "{0}-ParA-joint-counts-T{1}-N{2}.pdf".format(prefix, THRESHOLD, MIN_POINTS)
+    )
+    print("Saved file to {0}".format(fn))
+    plt.savefig(fn)
+    plt.close()
+
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 2, 1, aspect="equal")
+    ax2 = fig.add_subplot(1, 2, 2, aspect="equal")
+
+    new_counts = _get_rows(vdata[vdata.tether == "new"])
+    old_counts = _get_rows(vdata[vdata.tether == "old"])
+
+    countmap(ax, "New Pole", new_counts)
+    countmap(ax2, "Old Pole", old_counts)
+
+    plt.tight_layout()
+    fn = os.path.join(
+        "ParB_velocity",
+        "{0}-ParA-counts-T{1}-N{2}.pdf".format(prefix, THRESHOLD, MIN_POINTS)
+    )
+    print("Saved file to {0}".format(fn))
+    plt.savefig(fn)
+    plt.close()
+
+
+def _get_rows(data):
+    rows = [[
+        len(data[(data.direction == "towards") &
+                 (data.parA_direction == "towards")]),
+        len(data[(data.direction == "away") &
+                 (data.parA_direction == "towards")]),
+        len(data[(data.direction == "static") &
+                 (data.parA_direction == "towards")]),
+    ], [
+        len(data[(data.direction == "towards") &
+                 (data.parA_direction == "away")]),
+        len(data[(data.direction == "away") &
+                 (data.parA_direction == "away")]),
+        len(data[(data.direction == "static") &
+                 (data.parA_direction == "away")]),
+    ], [
+        len(data[(data.direction == "towards") &
+                 (data.parA_direction == "static")]),
+        len(data[(data.direction == "away") &
+                 (data.parA_direction == "static")]),
+        len(data[(data.direction == "static") &
+                 (data.parA_direction == "static")]),
+    ]]
+
+    names = ["towards", "away", "static", "total"]
+    out_data = pd.DataFrame(columns=names)
+    for n, r in zip(names, rows):
+        s = pd.Series(r + [np.sum(r)], name=n, index=names)
+        out_data = out_data.append(s)
+
+    d = []
+    for x in names:
+        d.append(int(out_data[x].sum()))
+    s = pd.Series(d, name="total", index=names)
+    out_data = out_data.append(s)
+    return out_data
+
+
+def countmap(sp_ax, title, counts):
+    plt.sca(sp_ax)
+    ax = sns.heatmap(
+        counts,
+        annot=True,
+        fmt=".00f",
+        cbar=False,
+    )
+
+    ax.collections[0].set_facecolor("#eeeeee")
+
+    for t in ax.texts:
+        t.set_color("k")
+
+    xlabels = ax.get_xticklabels()
+    ylabels = ax.get_yticklabels()
+    ax.set_xticklabels(xlabels, rotation=90)
+    ax.set_yticklabels(ylabels, rotation=0)
+#    ax.xaxis.set_ticks_position("top")
+#    ax.yaxis.set_ticks_position("right")
+#    ax.xaxis.set_label_position("top")
+#    ax.yaxis.set_label_position("right")
+    ax.set_xlabel("Direction relative to pole")
+    ax.set_ylabel("Direction relative to ParA peak")
+    ax.set_title(r"\Large {0}".format(title), y=1.08)
 
 
 def sub_analysis(vdata, prefix=""):
@@ -826,18 +1061,24 @@ def run(data, prefix=""):
     print("Got all data (n={0})".format(len(data)))
     if data:
         vdata = get_velocities(data)
-        plot_traces(vdata, prefix=prefix)
+#        plot_traces(vdata, prefix=prefix)
         plot_stats(vdata, prefix=prefix)
-        plot_examples(data, vdata, prefix=prefix)
+        save_stats(vdata, prefix=prefix)
+#        plot_examples(data, vdata, prefix=prefix)
         sub_analysis(vdata, prefix=prefix)
+        parA_analysis(vdata, prefix=prefix)
     else:
         print("No data, skipping")
 
 
 if __name__ == "__main__":
+    two_spot = "-r" in sys.argv and True or False
+    if two_spot:
+        print("Restricting analysis to cells that start with one spot "
+              "and end with two")
     if os.path.exists("mt"):
         # go go go
-        data = get_traces()
+        data = get_traces(two_spot=two_spot)
         try:
             prefix = sys.argv[1]
         except IndexError:
@@ -860,7 +1101,7 @@ if __name__ == "__main__":
                     if os.path.isdir(target) and sum(conf) == len(conf):
                         os.chdir(target)
                         print("  Handling {0}".format(target))
-                        data.extend(get_traces(orig_dir=orig_dir))
+                        data.extend(get_traces(orig_dir=orig_dir, two_spot=two_spot))
                         os.chdir(orig_dir)
             run(data, prefix=prefix)
     elif os.path.exists("wanted.json"):
@@ -880,6 +1121,6 @@ if __name__ == "__main__":
                 if os.path.isdir(target) and sum(conf) == len(conf):
                     os.chdir(target)
                     print("Handling {0}".format(target))
-                    data.extend(get_traces())
+                    data.extend(get_traces(two_spot=two_spot))
                     os.chdir(orig_dir)
         run(data, prefix="all")
