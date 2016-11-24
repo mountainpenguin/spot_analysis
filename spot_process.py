@@ -751,13 +751,13 @@ def main(noplot=False, wanted=True, target="ParB"):
         else:
             wantedlineages = None
     else:
-        wantedlineages = range(100)
+        wantedlineages = range(1000)
 
     if wantedlineages is None:
         print("No desired lineages in this directory")
         return
 
-    targetfiles = sorted(glob.glob("data/cell_lines/lineage*.npy"))
+    targetfiles = sorted(glob.glob("data/cell_lines/lineage*.npy"), key=lambda x: int(x.split("lineage")[1].split(".npy")[0]))
     if not targetfiles:
         path = get_path()
         if path and os.path.exists(path):
