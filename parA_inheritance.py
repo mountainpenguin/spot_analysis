@@ -289,7 +289,8 @@ def get_intensity(cell, method="sum"):
 
         intensity = values.sum()
     else:
-        intensity = values.max()
+#        intensity = cell.parA_fluorescence_unsmoothed.max()
+        intensity = cell.parA_fluorescence_smoothed.max()
 
     return intensity
 
