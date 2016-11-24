@@ -36,9 +36,9 @@ THRESHOLD = 0.15  # um / hr threshold for movement
 MIN_POINTS = 5
 
 
-def get_traces(orig_dir=None, two_spot=False):
+def get_traces(orig_dir=None, two_spot=False, reuse=True):
     data_hash = hashlib.sha1(os.getcwd().encode("utf8")).hexdigest()
-    if orig_dir and os.path.exists(os.path.join(orig_dir, "ParB_velocity", "data", data_hash)):
+    if reuse and orig_dir and os.path.exists(os.path.join(orig_dir, "ParB_velocity", "data", data_hash)):
         data_dir = os.path.join(orig_dir, "ParB_velocity", "data", data_hash)
         files = sorted(glob.glob(os.path.join(data_dir, "*.pandas")))
         spot_data = []
@@ -87,8 +87,9 @@ def get_traces(orig_dir=None, two_spot=False):
 
                 c_idx = list(cell_line[0].t).index(x[0])
                 cell = cell_line[c_idx]
-                parA_mid = cell.ParA[0]
-                d_parA.append(parA_mid - (cell.length[0][0] / 2))
+                parA_mid = cell.ParA[0] - (cell.length[0][0] / 2)
+                dparA = np.abs(parA_mid - x[1])
+                d_parA.append(dparA)
 
             data = pd.DataFrame(
                 data={
@@ -155,13 +156,19 @@ def get_velocities(data):
         # if negative: moving towards old pole
         # if positive: moving away from old pole
 
-        vparA = np.polyfit(timing, spot.d_parA.abs(), 1)[0] * PX * 60
+        vparA, c = np.polyfit(timing / 60, spot.d_parA * PX, 1)
         if vparA < -THRESHOLD:
-            parA_direction = "towards"
+            parAdirection = "towards"
         elif vparA > THRESHOLD:
-            parA_direction = "away"
+            parAdirection = "away"
         else:
-            parA_direction = "static"
+            parAdirection = "static"
+
+        vparAabs = np.abs(vparA)
+
+        initial_dparA = spot.d_parA[0] * PX
+        mean_dparA = spot.d_parA.mean() * PX
+        final_dparA = list(spot.d_parA)[-1] * PX
 
 #        plt.figure()
 #        plt.plot(timing, spot.cell_length / 2, "k-", lw=2)
@@ -215,9 +222,13 @@ def get_velocities(data):
             vold,                   # v_old
             np.abs(vabs),           # v_abs
             vparA,                  # v_parA
+            vparAabs,               # v_parA_abs
+            initial_dparA,
+            mean_dparA,
+            final_dparA,
             tether,                 # tether
             direction,              # direction
-            parA_direction,         # parA_direction
+            parAdirection,         # parAdirection
             spot._elongation_rate,  # elongation_rate
             len(timing),            # n
         )
@@ -278,8 +289,9 @@ def get_velocities(data):
 
     indexes = [
         "path", "top_dir", "sub_dir", "lin", "cid", "hash",
-        "v_mid", "v_new", "v_old", "v_abs", "v_parA",
-        "tether", "direction", "parA_direction",
+        "v_mid", "v_new", "v_old", "v_abs", "v_parA", "v_parA_abs",
+        "initial_dparA", "mean_dparA", "final_dparA",
+        "tether", "direction", "parAdirection",
         "elongation_rate", "n",
     ]
     velocities = pd.DataFrame(data=velocities, columns=indexes)
@@ -411,6 +423,7 @@ def plot_traces(vdata, prefix=""):
     plt.tight_layout()
     if not os.path.exists("ParB_velocity"):
         os.mkdir("ParB_velocity")
+
     fn = os.path.join(
         "ParB_velocity",
         "{2}-velocity-T{0}-N{1}.pdf".format(THRESHOLD, MIN_POINTS, prefix)
@@ -640,9 +653,6 @@ def plot_stats(vdata, prefix=""):
     ax.set_xticklabels(["New", "Old"])
     ax.set_xlabel("")
     ax.set_ylabel("Velocity (\si{\micro\metre\per\hour})")
-
-    # get mean elongation rate of population
-
     sns.despine()
 
     ax = fig.add_subplot(rows, cols, sp_num + 1)
@@ -780,48 +790,124 @@ def _sub_analyse(x):
     return(a, b, c)
 
 
-def _parA_plot(ax1, ax2, title, data):
-    plt.sca(ax1)
-    ax1.set_title(title)
-    sns.barplot(
-        x="parA_direction",
-        y=data.v_parA.abs(),
-        data=data,
-        order=["towards", "away", "static"],
-        ci=95
-    )
-    ax1.set_ylabel("Velocity (\si{\micro\metre\per\hour})")
-    ax1.set_xlabel("")
-    sns.despine()
-
-    plt.sca(ax2)
-    sns.countplot(
-        x="parA_direction",
-        data=data,
-        order=["towards", "away", "static"],
-    )
-    ax2.set_xlabel("")
-    ax2.set_ylabel("Number of Foci")
-    sns.despine()
+#def _parA_plot(ax1, ax2, title, data):
+#    plt.sca(ax1)
+#    ax1.set_title(title)
+#    sns.barplot(
+#        x="parAdirection",
+#        y=data.v_parA.abs(),
+#        data=data,
+#        order=["towards", "away", "static"],
+#        ci=95
+#    )
+##    sns.swarmplot(
+##        x="parAdirection",
+##        y=data.v_parA.abs(),
+##        data=data,
+##        order=["towards", "away", "static"],
+##    )
+#
+#    ax1.set_ylabel("Velocity (\si{\micro\metre\per\hour})")
+#    ax1.set_xlabel("")
+#    sns.despine()
+#
+#    plt.sca(ax2)
+#    sns.countplot(
+#        x="parAdirection",
+#        data=data,
+#        order=["towards", "away", "static"],
+#    )
+#    ax2.set_xlabel("")
+#    ax2.set_ylabel("Number of Foci")
+#    sns.despine()
 
 
 def parA_analysis(vdata, prefix=""):
     """ Analysis of spot movement relative to ParA """
     fig = plt.figure()
+
+    sp_num = 1
+    rows = 1
+    cols = 3
+    row_num = 0
     _bigax(
         fig,
         xlabel=("Direction relative to ParA peak", {"labelpad": 10}),
-        spec=(2, 1, 1),
+        spec=(rows, 1, row_num + 1),
     )
-    ax1 = fig.add_subplot(2, 2, 1)
-    ax2 = fig.add_subplot(2, 2, 3)
-    new_data = vdata[vdata.tether == "new"]
-    _parA_plot(ax1, ax2, "New Pole", new_data)
+    hue_order = ["towards", "away", "static"]
 
-    ax1 = fig.add_subplot(2, 2, 2, sharey=ax1)
-    ax2 = fig.add_subplot(2, 2, 4, sharey=ax2)
-    old_data = vdata[vdata.tether == "old"]
-    _parA_plot(ax1, ax2, "Old Pole", old_data)
+    ax = fig.add_subplot(rows, cols, sp_num)
+#    sns.swarmplot(
+#        x="tether",
+#        y="v_parA",
+#        data=vdata[vdata.tether != None],
+#        hue="parAdirection",
+#        order=["new", "old"],
+#        hue_order=hue_order,
+#    )
+#    sns.barplot(
+#        x="tether",
+#        y="v_parA_abs",
+#        data=vdata[vdata.tether != None],
+#        hue="parAdirection",
+#        order=["new", "old"],
+#        hue_order=hue_order,
+#        ci=95,
+#    )
+#    ax.set_xticklabels(["New", "Old"])
+
+    sns.barplot(
+        x="parAdirection",
+        y="v_parA_abs",
+        data=vdata,
+        order=["towards", "away", "static"],
+        ci=95,
+    )
+
+    ax.set_xlabel("")
+    ax.set_ylabel("Velocity (\si{\micro\metre\per\hour})")
+    sns.despine()
+
+    ax = fig.add_subplot(rows, cols, sp_num + 1)
+#    sns.countplot(
+#        x="tether",
+#        data=vdata[vdata.tether != None],
+#        hue="parAdirection",
+#        order=["new", "old"],
+#        hue_order=hue_order,
+#    )
+#    ax.set_xticklabels(["New", "Old"])
+
+    sns.countplot(
+        x="parAdirection",
+        data=vdata,
+        order=["towards", "away", "static"],
+    )
+    ax.set_xlabel("")
+    ax.set_ylabel("Number of Foci")
+    sns.despine()
+
+    ax = fig.add_subplot(rows, cols, sp_num + 2)
+    vdata["parAmovement"] = ((vdata.parAdirection == "towards") | (vdata.parAdirection == "static"))
+    vdata["parAmovement"][vdata.parAmovement] = "static\/towards"
+    vdata["parAmovement"][vdata.parAmovement == False] = "away"
+#    sns.countplot(
+#        x="tether",
+#        data=vdata[vdata.tether != None],
+#        hue="parAmovement",
+#        order=["new", "old"],
+#        hue_order=["static\/towards", "away"],
+#    )
+#    ax.set_xticklabels(["New", "Old"])
+    sns.countplot(
+        x="parAmovement",
+        data=vdata,
+        order=["static\/towards", "away"],
+    )
+    ax.set_xlabel("")
+    ax.set_ylabel("Number of Foci")
+    sns.despine()
 
     plt.tight_layout()
 
@@ -835,9 +921,13 @@ def parA_analysis(vdata, prefix=""):
 
     plt.figure()
     ax3 = fig.add_subplot(1, 1, 1)
-    vdata["parAmovement"] = ((vdata.parA_direction == "towards") | (vdata.parA_direction == "static"))
+    vdata["parAmovement"] = ((vdata.parAdirection == "towards") | (vdata.parAdirection == "static"))
     vdata["parAmovement"][vdata.parAmovement] = "static\/towards"
     vdata["parAmovement"][vdata.parAmovement == False] = "away"
+
+    print("ParAB movement:")
+    print("towards/with:", len(vdata[(vdata.tether != None) & (vdata.parAmovement == "static\/towards")]))
+    print("away:", len(vdata[(vdata.tether != None) & (vdata.parAmovement == "away")]))
 
     sns.countplot(
         x="tether",
@@ -883,25 +973,25 @@ def parA_analysis(vdata, prefix=""):
 def _get_rows(data):
     rows = [[
         len(data[(data.direction == "towards") &
-                 (data.parA_direction == "towards")]),
+                 (data.parAdirection == "towards")]),
         len(data[(data.direction == "away") &
-                 (data.parA_direction == "towards")]),
+                 (data.parAdirection == "towards")]),
         len(data[(data.direction == "static") &
-                 (data.parA_direction == "towards")]),
+                 (data.parAdirection == "towards")]),
     ], [
         len(data[(data.direction == "towards") &
-                 (data.parA_direction == "away")]),
+                 (data.parAdirection == "away")]),
         len(data[(data.direction == "away") &
-                 (data.parA_direction == "away")]),
+                 (data.parAdirection == "away")]),
         len(data[(data.direction == "static") &
-                 (data.parA_direction == "away")]),
+                 (data.parAdirection == "away")]),
     ], [
         len(data[(data.direction == "towards") &
-                 (data.parA_direction == "static")]),
+                 (data.parAdirection == "static")]),
         len(data[(data.direction == "away") &
-                 (data.parA_direction == "static")]),
+                 (data.parAdirection == "static")]),
         len(data[(data.direction == "static") &
-                 (data.parA_direction == "static")]),
+                 (data.parAdirection == "static")]),
     ]]
 
     names = ["towards", "away", "static", "total"]
@@ -1061,6 +1151,10 @@ def run(data, prefix=""):
     print("Got all data (n={0})".format(len(data)))
     if data:
         vdata = get_velocities(data)
+#        plt.close()
+#        plt.figure()
+#        sns.pairplot(vdata[["v_parA", "v_abs", "elongation_rate", "initial_dparA", "mean_dparA", "final_dparA"]])
+#        plt.show()
 #        plot_traces(vdata, prefix=prefix)
         plot_stats(vdata, prefix=prefix)
         save_stats(vdata, prefix=prefix)
@@ -1076,9 +1170,11 @@ if __name__ == "__main__":
     if two_spot:
         print("Restricting analysis to cells that start with one spot "
               "and end with two")
+    reuse = "-x" not in sys.argv and True or False
+
     if os.path.exists("mt"):
         # go go go
-        data = get_traces(two_spot=two_spot)
+        data = get_traces(two_spot=two_spot, reuse=reuse)
         try:
             prefix = sys.argv[1]
         except IndexError:
@@ -1101,7 +1197,7 @@ if __name__ == "__main__":
                     if os.path.isdir(target) and sum(conf) == len(conf):
                         os.chdir(target)
                         print("  Handling {0}".format(target))
-                        data.extend(get_traces(orig_dir=orig_dir, two_spot=two_spot))
+                        data.extend(get_traces(orig_dir=orig_dir, two_spot=two_spot, reuse=reuse))
                         os.chdir(orig_dir)
             run(data, prefix=prefix)
     elif os.path.exists("wanted.json"):
@@ -1121,6 +1217,6 @@ if __name__ == "__main__":
                 if os.path.isdir(target) and sum(conf) == len(conf):
                     os.chdir(target)
                     print("Handling {0}".format(target))
-                    data.extend(get_traces(two_spot=two_spot))
+                    data.extend(get_traces(two_spot=two_spot, reuse=reuse))
                     os.chdir(orig_dir)
         run(data, prefix="all")
