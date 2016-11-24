@@ -232,10 +232,10 @@ class InteractivePlot(object):
             ymax = img.shape[0] - 1
 
         img[np.isnan(img)] = 0
-        ## general area method
-#        roi = img[ymin:ymax, xmin:xmax]
+        # general area method
+        roi = img[ymin:ymax, xmin:xmax]
 
-        ## bounding box method
+        # bounding box method
 #        roi_xs = np.dstack([self.current_cell.mesh[:, 0], self.current_cell.mesh[:, 2]])
 #        roi_x1 = roi_xs.min()
 #        roi_x2 = roi_xs.max()
@@ -244,18 +244,18 @@ class InteractivePlot(object):
 #        roi_y2 = roi_ys.max()
 #        roi = img[roi_y1:roi_y2, roi_x1:roi_x2]
 
-        ## polygon method
-        vertices = np.vstack([
-            np.concatenate([self.current_cell.mesh[:, 0], self.current_cell.mesh[:, 2]]),
-            np.concatenate([self.current_cell.mesh[:, 1], self.current_cell.mesh[:, 3]]),
-        ]).T
-        num_r, num_c = img.shape
-        ygrid, xgrid = np.mgrid[:num_r, :num_c]
-        xycoords = np.vstack((xgrid.ravel(), ygrid.ravel())).T
-        roi_path = matplotlib.path.Path(vertices, closed=False)
-        roi_mask = roi_path.contains_points(xycoords)
-        roi_mask = roi_mask.reshape(img.shape)
-        roi = np.ma.masked_array(img, ~roi_mask)
+        # polygon method
+#        vertices = np.vstack([
+#            np.concatenate([self.current_cell.mesh[:, 0], self.current_cell.mesh[:, 2]]),
+#            np.concatenate([self.current_cell.mesh[:, 1], self.current_cell.mesh[:, 3]]),
+#        ]).T
+#        num_r, num_c = img.shape
+#        ygrid, xgrid = np.mgrid[:num_r, :num_c]
+#        xycoords = np.vstack((xgrid.ravel(), ygrid.ravel())).T
+#        roi_path = matplotlib.path.Path(vertices, closed=False)
+#        roi_mask = roi_path.contains_points(xycoords)
+#        roi_mask = roi_mask.reshape(img.shape)
+#        roi = np.ma.masked_array(img, ~roi_mask)
 
         # debug
 #        plt.figure()
