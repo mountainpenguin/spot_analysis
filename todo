@@ -1,12 +1,4 @@
-- ParA localisation: low inheritors vs high inheritors
-- improvements for spot_process:
-    hide button (temporarily hide all spots)
-    phase button (switch to phase image with cell outline, toggle button)
-- arrange cells on heatmaps as a representation of lineage tree rather than having the tree diagram
-- add initial cell on heatmaps (i.e. show cell at time 0 and time -1)
 - cell length / age at ParB split point
-- ParB localisation at division/birth, relative to new pole (septum)
-    sum as for ParA
 - ParB movement vs ParA 'local' gradient
 - ParB movement vs diffusion (<(change in x)^2> ~ 2D(change in t)
     plot <(change in x)^2> for all time windows vs time window size?
@@ -14,3 +6,7 @@
 - % cells where ParA is not present at the future division place in the frame before division
     requires some sort of local thresholding?
 - ParA/B model to predict minicell/anuclear cell frequencies
+- arrange cells on heatmaps as a representation of lineage tree rather than having the tree diagram (currently done with Illustrator)
+- improvements for spot_process:
+    hide button (temporarily hide all spots)
+    phase button (switch to phase image with cell outline, toggle button)
