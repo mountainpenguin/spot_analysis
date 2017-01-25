@@ -398,6 +398,8 @@ def iterate():
     for d in dirs:
 #        query = input("Process {0}? (Y/n): ".format(d))
 #        if query.lower() != "n":
+        if d.startswith("delParA "):
+            continue
         subdirs = filter(lambda y: os.path.isdir(os.path.join(d, y)), os.listdir(d))
         for subdir in subdirs:
             exists = ["mt", "ancestry.json", "lineages.json", "data/cell_lines/lineage01.npy"]
@@ -517,14 +519,18 @@ def plot_representation(data, spnum):
     d = pd.DataFrame({"area": areas, "total": totals, "max": maxes})
 
     plt.subplot(spnum)
-    sns.regplot(x="area", y="total", data=d)
+    sns.regplot(x="child1_area", y="child1_total", data=data, fit_reg=False)
+    sns.regplot(x="child2_area", y="child2_total", data=data, fit_reg=False)
+    sns.regplot(x="area", y="total", data=d, scatter=False, line_kws={"alpha": 0.6})
     shared.add_stats(d, "area", "total", m=False)
     plt.xlabel("Cell Area (um$^2$)")
     plt.ylabel("Total ParA Intensity (AU)")
     sns.despine()
 
     plt.subplot(spnum + 1)
-    sns.regplot(x="area", y="max", data=d)
+    sns.regplot(x="child1_area", y="child1_max", data=data, fit_reg=False)
+    sns.regplot(x="child2_area", y="child2_max", data=data, fit_reg=False)
+    sns.regplot(x="area", y="max", data=d, scatter=False, line_kws={"alpha": 0.6})
     shared.add_stats(d, "area", "max", m=False)
     plt.xlabel("Cell Area (um$^2$)")
     plt.ylabel("Maximum ParA Intensity (AU)")
