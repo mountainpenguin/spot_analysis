@@ -1,11 +1,11 @@
 Priorities:
 - determine movement of ParB relative to ParA
     velocity towards ParA as a function of distance?
-- determine ParA distribution
-    i.e. a peak or homogeneous, and how is this inherited at division
 - ParB movement vs diffusion (<(change in x)^2> ~ 2D(change in t)
     plot <(change in x)^2> for all time windows vs time window size?
 - determine whether ParB movement is more or less random than expected relative to ParA and the poles (related to above?)
+- determine ParA distribution
+    i.e. a peak or homogeneous, and how is this inherited at division
 
 Others:
 - cell length / age at ParB split point
