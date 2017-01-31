@@ -36,7 +36,8 @@ THRESHOLD = 0.15  # um / hr threshold for movement
 MIN_POINTS = 5
 
 
-def get_traces(orig_dir=None, two_spot=False, reuse=True):
+def get_traces(orig_dir=None, spot_filter=None, reuse=True):
+    """ spot_filter must be a function returning allowed numbers, e.g. lamdba num_spots: True/False """
     data_hash = hashlib.sha1(os.getcwd().encode("utf8")).hexdigest()
     if reuse and orig_dir and os.path.exists(os.path.join(orig_dir, "ParB_velocity", "data", data_hash)):
         data_dir = os.path.join(orig_dir, "ParB_velocity", "data", data_hash)
@@ -60,12 +61,8 @@ def get_traces(orig_dir=None, two_spot=False, reuse=True):
         T = cell_line[0].T
         paths = shared.get_parB_path(cell_line, T, lineage_num)
 
-        if two_spot:
-            if len(paths) != 3:
-                continue
-
-            if len(cell_line[0].ParB) != 1:
-                continue
+        if spot_filter and not spot_filter(len(paths)):
+            continue
 
         cell_elongation_rate = shared.get_elongation_rate(cell_line)
         if cell_elongation_rate and cell_elongation_rate < 0:
@@ -1170,11 +1167,14 @@ if __name__ == "__main__":
     if two_spot:
         print("Restricting analysis to cells that start with one spot "
               "and end with two")
+        spot_filter = lambda x: x == 2
+    else:
+        spot_filter = None
     reuse = "-x" not in sys.argv and True or False
 
     if os.path.exists("mt"):
         # go go go
-        data = get_traces(two_spot=two_spot, reuse=reuse)
+        data = get_traces(spot_filter=spot_filter, reuse=reuse)
         try:
             prefix = sys.argv[1]
         except IndexError:
@@ -1197,7 +1197,7 @@ if __name__ == "__main__":
                     if os.path.isdir(target) and sum(conf) == len(conf):
                         os.chdir(target)
                         print("  Handling {0}".format(target))
-                        data.extend(get_traces(orig_dir=orig_dir, two_spot=two_spot, reuse=reuse))
+                        data.extend(get_traces(orig_dir=orig_dir, spot_filter=spot_filter, reuse=reuse))
                         os.chdir(orig_dir)
             run(data, prefix=prefix)
     elif os.path.exists("wanted.json"):
