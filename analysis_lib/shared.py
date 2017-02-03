@@ -9,6 +9,7 @@ import string
 import os
 import matplotlib.pyplot as plt
 import scipy.stats
+import warnings
 
 
 class TraceConnect(object):
@@ -301,3 +302,26 @@ def add_stats(data, xkey, ykey, ax=None, m=True, r2=True, n=True):
     if n:
         plt.plot(x[0], y[0], color="none", alpha=1, label=r"$n = {0}$".format(len(dataset)))
     plt.legend()
+
+
+def get_wanted():
+    if not os.path.exists("wanted.json"):
+        warn_msg = "'wanted.json' was not found in current path, no directories to search"
+        warnings.warn(warn_msg, RuntimeWarning)
+        return []
+
+    input_wanted = json.loads(open("wanted.json").read())
+    top_level = input_wanted.keys()
+    dirlist = []
+    for directory in top_level:
+        for sub_directory in os.listdir(directory):
+            target = os.path.join(directory, sub_directory)
+            target_conf = [
+                os.path.join(directory, sub_directory, "mt", "mt.mat"),
+                os.path.join(directory, sub_directory, "data", "cell_lines", "lineage01.npy"),
+                os.path.join(directory, sub_directory, "poles.json"),
+            ]
+            conf = [os.path.exists(x) for x in target_conf]
+            if os.path.isdir(target) and sum(conf) == len(conf):
+                dirlist.append(target)
+    return dirlist
